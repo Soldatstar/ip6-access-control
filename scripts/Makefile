@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra
-LDFLAGS = 
+LDFLAGS = -lssl -lcrypto
 
 # Source paths
 SUPERVISOR_DIR = ../supervisor

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <openssl/sha.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -18,6 +20,30 @@
 
 #define USER_TOOL_SOCKET "/tmp/user_tool.sock"
 
+char program_hash[65]; //Global variable to store the hash of the executing program
+
+FILE *log_file;
+//macro to log messages to console and log file
+void log_message(const char *format, ...) {
+    va_list args;
+
+    // Create a new format string with the suffix
+    char new_format[256];
+    snprintf(new_format, sizeof(new_format), "%s [Supervisor] ", format);
+
+    // Print to console
+    va_start(args, format);
+    vprintf(new_format, args);
+    va_end(args);
+
+    // Print to log file
+    if (log_file) {
+        va_start(args, format);
+        vfprintf(log_file, new_format, args);
+        va_end(args);
+    }
+}
+
 // Helper function to get syscall name
 const char* get_syscall_name(long syscall_nr) {
     switch(syscall_nr) {
@@ -30,9 +56,55 @@ const char* get_syscall_name(long syscall_nr) {
     }
 }
 
+
+// Function to compute SHA-256 hash of a string
+void compute_sha256(const char *str, char outputBuffer[65]) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, str, strlen(str));
+    SHA256_Final(hash, &sha256);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+    }
+    outputBuffer[64] = '\0';
+}
+
+// #####Function to check if decision exists in the log file#####
+int check_decision_log(const char *syscall_name, long syscall_nr) {
+    char log_filename[128];
+    snprintf(log_filename, sizeof(log_filename), "../user-tool/decision-%s.log", program_hash);
+    
+    log_message("Opening policy file: %s\n", log_filename);
+    FILE *file = fopen(log_filename, "r");
+    if (!file) {
+        log_message("Failed to open decision log file\n");
+        return 0;
+    }
+
+    char line[256];
+    char syscall_nr_str[20];
+    sprintf(syscall_nr_str, "%ld", syscall_nr);
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, syscall_name) && strstr(line, syscall_nr_str)) {
+            if (strstr(line, "ALLOW")) {
+                fclose(file);
+                return 1; // Decision: ALLOW
+            } else if (strstr(line, "DENY")) {
+                fclose(file);
+                return -1; // Decision: DENY
+            }
+        }
+        
+    }
+
+    fclose(file);
+    return 0; // Decision not found
+}
+
 // Function to connect to user-tool
 int connect_to_user_tool() {
-    printf("[Supervisor] Connecting to user-tool daemon...\n");
+    log_message("Connecting to user-tool daemon...\n");
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock == -1) {
         perror("[Supervisor] Failed to create socket for user-tool connection");
@@ -49,21 +121,21 @@ int connect_to_user_tool() {
         close(sock);
         return -1;
     }
-    printf("[Supervisor] Successfully connected to user-tool daemon\n");
+    log_message("Successfully connected to user-tool daemon\n");
     return sock;
 }
 
 // Function to ask user-tool for permission
 int ask_permission(int user_tool_sock, int syscall_nr) {
-    char request[64];
-    snprintf(request, sizeof(request), "SYSCALL:%d", syscall_nr);
+    char buffer[256];
     
-    printf("[Supervisor] Requesting permission for syscall %s (%d)\n", 
-           get_syscall_name(syscall_nr), syscall_nr);
-    
-    if (write(user_tool_sock, request, strlen(request)) == -1) {
-        perror("[Supervisor] Failed to send request to user-tool");
-        return -1;
+    log_message("Requesting permission for syscall %s (%d)\n", 
+                get_syscall_name(syscall_nr), syscall_nr);
+    // Send the syscall number and hash to the user tool
+    snprintf(buffer, sizeof(buffer), "SYSCALL:%ld HASH:%s", syscall_nr, program_hash);
+    if (write(user_tool_sock, buffer, strlen(buffer)) == -1) {
+        perror("write");
+        return 0;
     }
 
     char response[8];
@@ -73,19 +145,25 @@ int ask_permission(int user_tool_sock, int syscall_nr) {
         return -1;
     }
     response[bytes] = '\0';
-    printf("[Supervisor] User-tool response: %s\n", response);
+    log_message("User-tool response: %s\n", response);
 
     return strcmp(response, "ALLOW") == 0;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <program> [args...]\n", argv[0]);
+    log_file = fopen("supervisor.log", "a");
+    if (!log_file) {
+        log_message("Failed to open log file\n");
         return 1;
     }
 
-    printf("\n[Supervisor] Starting supervision of program: %s\n", argv[1]);
-    
+    if (argc < 2) {
+        log_message("Usage: %s <program> [args...]\n", argv[0]);
+        return 1;
+    }
+
+
+    log_message("Starting supervision of program: %s\n", argv[1]);
     // Build absolute path for target program
     char abs_path[1024];
     if (argv[1][0] != '/') {
@@ -95,26 +173,28 @@ int main(int argc, char *argv[]) {
         }
         argv[1] = abs_path;
     }
-    printf("[Supervisor] Full program path: %s\n", argv[1]);
+    log_message("Full program path: %s\n", argv[1]);
+    compute_sha256(argv[1], program_hash);
+    log_message("Program hash: %s\n", program_hash);
 
     int user_tool_sock = connect_to_user_tool();
     if (user_tool_sock == -1) {
-        fprintf(stderr, "[Supervisor] ERROR: Make sure user-tool is running first!\n");
+        log_message("ERROR: Make sure user-tool is running first!\n");
         return 1;
     }
 
     pid_t child = fork();
     if (child == -1) {
-        perror("[Supervisor] Fork failed");
+        log_message("Fork failed\n");
         return 1;
     }
 
     if (child == 0) {
         // Child process - this will become the monitored program
-        printf("[Supervisor] Starting monitored program (PID: %d)\n", getpid());
+        log_message("Starting monitored program (PID: %d)\n", getpid());
         
         if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1) {
-            perror("[Supervisor] Failed to set up ptrace");
+            log_message("Failed to set up ptrace\n");
             exit(1);
         }
 
@@ -122,7 +202,7 @@ int main(int argc, char *argv[]) {
         raise(SIGSTOP);
 
         // Set up seccomp
-        printf("[Supervisor] Setting up system call filtering...\n");
+        log_message("Setting up  system call filtering...\n");
         prctl(PR_SET_NO_NEW_PRIVS, 1);
         
         struct sock_filter filter[] = {
@@ -147,23 +227,23 @@ int main(int argc, char *argv[]) {
         };
 
         if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) == -1) {
-            perror("[Supervisor] Failed to set up seccomp filter");
+            log_message("Failed to set up seccomp filter\n");
             exit(1);
         }
 
-        printf("[Supervisor] Executing monitored program: %s\n", argv[1]);
+        log_message("Executing monitored program: %s\n", argv[1]);
         execv(argv[1], &argv[1]);
-        perror("[Supervisor] Failed to execute program");
+        log_message("Failed to execute program\n");
         exit(1);
     }
 
     // Parent process - this is the supervisor
-    printf("[Supervisor] Monitoring process PID: %d\n", child);
+    log_message("Monitoring process PID: %d\n", child);
     
     // Wait for child to stop
     int status;
     if (waitpid(child, &status, 0) == -1) {
-        perror("[Supervisor] Initial waitpid failed");
+        log_message("Initial waitpid failed\n");
         return 1;
     }
 
@@ -171,24 +251,24 @@ int main(int argc, char *argv[]) {
     if (ptrace(PTRACE_SETOPTIONS, child, 0, 
                PTRACE_O_TRACESYSGOOD | 
                PTRACE_O_TRACESECCOMP) == -1) {
-        perror("[Supervisor] Failed to set ptrace options");
+        log_message("Failed to set ptrace options\n");
         return 1;
     }
 
     // Continue the child
     ptrace(PTRACE_CONT, child, 0, 0);
 
-    printf("[Supervisor] Beginning system call monitoring...\n\n");
+    log_message("Beginning system call monitoring...\n");
 
     while (1) {
         if (waitpid(child, &status, 0) == -1) {
-            perror("[Supervisor] waitpid failed");
+            log_message("waitpid failed\n");
             break;
         }
 
         if (WIFEXITED(status)) {
-            printf("[Supervisor] Monitored program exited with status %d\n", 
-                   WEXITSTATUS(status));
+            log_message("Monitored program exited with status %d\n", 
+                        WEXITSTATUS(status));
             break;
         }
 
@@ -199,7 +279,7 @@ int main(int argc, char *argv[]) {
                 
                 struct user_regs_struct regs;
                 if (ptrace(PTRACE_GETREGS, child, 0, &regs) == -1) {
-                    perror("[Supervisor] Failed to get registers");
+                    log_message("Failed to get registers\n");
                     continue;
                 }
 
@@ -210,24 +290,36 @@ int main(int argc, char *argv[]) {
                 #endif
 
                 if (syscall == SYS_socket || syscall == SYS_connect) {
-                    printf("[Supervisor] Intercepted %s system call\n", 
-                           get_syscall_name(syscall));
-                    
-                    int allow = ask_permission(user_tool_sock, syscall);
-                    if (!allow) {
-                        printf("[Supervisor] Blocking %s system call\n", 
-                               get_syscall_name(syscall));
+                    const char *syscall_name = get_syscall_name(syscall);
+                    log_message("Intercepted %s system call\n", syscall_name);
+                    int decision = check_decision_log(syscall_name, syscall);
+                    if (decision == 1) {
+                        log_message("Allowing %s system call based on policy\n", syscall_name);
+                    } else if (decision == -1) {
+                        log_message("Blocking %s system call based on policy\n", syscall_name);
                         #ifdef __x86_64__
                         regs.rax = -EPERM;
                         #else
                         regs.eax = -EPERM;
                         #endif
                         if (ptrace(PTRACE_SETREGS, child, 0, &regs) == -1) {
-                            perror("[Supervisor] Failed to set registers");
+                            log_message("Failed to set registers\n");
                         }
                     } else {
-                        printf("[Supervisor] Allowing %s system call\n", 
-                               get_syscall_name(syscall));
+                        int allow = ask_permission(user_tool_sock, syscall);
+                        if (!allow) {
+                            log_message("Blocking %s system call based on user decision\n", syscall_name);
+                            #ifdef __x86_64__
+                            regs.rax = -EPERM;
+                            #else
+                            regs.eax = -EPERM;
+                            #endif
+                            if (ptrace(PTRACE_SETREGS, child, 0, &regs) == -1) {
+                                log_message("Failed to set registers\n");
+                            }
+                        } else {
+                            log_message("Allowing %s system call based on user decision\n", syscall_name);
+                        }
                     }
                 }
             }
@@ -236,5 +328,6 @@ int main(int argc, char *argv[]) {
     }
 
     close(user_tool_sock);
+    fclose(log_file);
     return 0;
 }

@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <fcntl.h>
+
 
 #define SOCKET_PATH "/tmp/user_tool.sock"
 
@@ -14,9 +16,10 @@ void handle_connection(int client_sock) {
     while ((bytes_read = read(client_sock, buffer, sizeof(buffer) - 1)) > 0) {
         buffer[bytes_read] = '\0';
         
-        // Parse the syscall number
+        // Parse the syscall number and program hash
         int syscall_nr;
-        if (sscanf(buffer, "SYSCALL:%d", &syscall_nr) != 1) {
+        char program_hash[65];
+        if (sscanf(buffer, "SYSCALL:%d HASH:%64s", &syscall_nr, program_hash) != 2) {
             fprintf(stderr, "Invalid request format\n");
             continue;
         }
@@ -44,6 +47,17 @@ void handle_connection(int client_sock) {
 
         const char *decision = (response == 'y' || response == 'Y') ? "ALLOW" : "DENY";
         write(client_sock, decision, strlen(decision));
+
+        // Save decision to decision-[hash].log
+        char log_filename[80];
+        snprintf(log_filename, sizeof(log_filename), "decision-%s.log", program_hash);
+        int fd = open(log_filename, O_WRONLY | O_APPEND | O_CREAT, 0644);
+        if (fd != -1) {
+            dprintf(fd, "System call: %s (%d) - Decision: %s\n", syscall_name, syscall_nr, decision);
+            close(fd);
+        } else {
+            perror("Failed to open decision log file");
+        }
     }
 }
 
