@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <openssl/sha.h>
+#include <openssl/evp.h>
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -57,14 +58,20 @@ const char* get_syscall_name(long syscall_nr) {
 }
 
 
-// Function to compute SHA-256 hash of a string
 void compute_sha256(const char *str, char outputBuffer[65]) {
+    EVP_MD_CTX *mdctx;
+    const EVP_MD *md;
     unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, str, strlen(str));
-    SHA256_Final(hash, &sha256);
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+    unsigned int md_len;
+
+    md = EVP_sha256();
+    mdctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(mdctx, md, NULL);
+    EVP_DigestUpdate(mdctx, str, strlen(str));
+    EVP_DigestFinal_ex(mdctx, hash, &md_len);
+    EVP_MD_CTX_free(mdctx);
+
+    for (unsigned int i = 0; i < md_len; i++) {
         sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
     }
     outputBuffer[64] = '\0';
@@ -132,7 +139,7 @@ int ask_permission(int user_tool_sock, int syscall_nr) {
     log_message("Requesting permission for syscall %s (%d)\n", 
                 get_syscall_name(syscall_nr), syscall_nr);
     // Send the syscall number and hash to the user tool
-    snprintf(buffer, sizeof(buffer), "SYSCALL:%ld HASH:%s", syscall_nr, program_hash);
+    snprintf(buffer, sizeof(buffer), "SYSCALL:%d HASH:%s", syscall_nr, program_hash);
     if (write(user_tool_sock, buffer, strlen(buffer)) == -1) {
         perror("write");
         return 0;

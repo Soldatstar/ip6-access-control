@@ -44,6 +44,7 @@ Entwicklung eines intuitiven Sicherheitssystems für Linux, das Endnutzern eine 
 # Build-Prozess
 cd scripts
 make all      # Kompiliert alle Komponenten
-make test     # Führt Demoszenario aus
+sudo make test     # Führt Demoszenario aus
+make clean # Löschen der kompilierten Komponenten
 ```
 
