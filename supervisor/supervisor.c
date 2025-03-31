@@ -30,18 +30,20 @@ void log_message(const char *format, ...) {
 
     // Create a new format string with the suffix
     char new_format[256];
-    snprintf(new_format, sizeof(new_format), "%s [Supervisor] ", format);
+    snprintf(new_format, sizeof(new_format), "%s[Supervisor] ", format);
 
     // Print to console
     va_start(args, format);
     vprintf(new_format, args);
     va_end(args);
+    
 
     // Print to log file
     if (log_file) {
         va_start(args, format);
         vfprintf(log_file, new_format, args);
         va_end(args);
+        fflush(log_file);
     }
 }
 
