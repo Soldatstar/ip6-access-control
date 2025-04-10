@@ -12,7 +12,7 @@ help:
 	@echo "Verfügbare Befehle:"
 	@echo "  make create: Erstellt ein virtuelles Environment und installiert Abhängigkeiten."
 	@echo "  make delete: Löscht das virtuelle Environment."
-	@echo "  make run: Aktiviert das virtuelle Environment und führt main.py aus (Linux)."
+	@echo "  make run: Aktiviert das virtuelle Environment und führt supervisor.py aus (Linux)."
 
 # Ziel zum Erstellen des virtuellen Environments und Installieren der Abhängigkeiten
 create: 
