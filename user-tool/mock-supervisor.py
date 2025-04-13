@@ -28,14 +28,16 @@ def check_decision_json(program_hash: str, syscall_nr: int) -> Optional[str]:
         logger.error(f"Policy file {policy_file} is empty or invalid.")
         return None
 
-    if syscall_nr in data.get("rules", {}).get("denied_syscalls", []):
-        return "DENY"
-    if syscall_nr in data.get("rules", {}).get("allowed_syscalls", []):
-        return "ALLOW"
+    for syscall, parameter in data.get("rules", {}).get("denied_syscalls", []):
+        if syscall == syscall_nr:
+            return "DENY"
+    for syscall, parameter in data.get("rules", {}).get("allowed_syscalls", []):
+        if syscall == syscall_nr:
+            return "ALLOW"
     return None
 
 def ask_user_tool(client_sock: socket.socket, syscall_nr: int, program_hash: str, program_name: str, program_path: str) -> str:
-    request = f"SYSCALL:{syscall_nr} HASH:{program_hash} NAME:{program_name} PATH:{program_path}"
+    request = f"SYSCALL:{syscall_nr} NAME:{program_name} HASH:{program_hash} PATH:{program_path}"  
     logger.info(f"Requesting decision from user-tool: {request}")
     client_sock.sendall(request.encode())
     response = client_sock.recv(256).decode().strip()

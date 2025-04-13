@@ -65,8 +65,8 @@ def handle_connection(client_sock: socket.socket):
             logger.error(f"Error handling connection: {e}")
             break
 
-def save_decision(program_name: str, program_path: str, program_hash: str, syscall_nr: int, decision: str, user: str = "user123"):
-    process_dir = os.path.join(POLICIES_DIR, program_hash)
+def save_decision(program_name: str, program_path: str, program_hash: str, syscall_nr: int, decision: str, user: str = "user123", parameter: str = "parameter"):
+    process_dir = os.path.join(POLICIES_DIR, program_hash)  
     os.makedirs(process_dir, exist_ok=True)
     policy_file = os.path.join(process_dir, "policy.json")
 
@@ -97,12 +97,13 @@ def save_decision(program_name: str, program_path: str, program_hash: str, sysca
         }
 
     # Update the policy based on the decision
+    syscall_entry = [syscall_nr, parameter]
     if decision == "ALLOW":
-        if syscall_nr not in data["rules"]["allowed_syscalls"]:
-            data["rules"]["allowed_syscalls"].append(syscall_nr)
+        if syscall_entry not in data["rules"]["allowed_syscalls"]:
+            data["rules"]["allowed_syscalls"].append(syscall_entry)
     else:
-        if syscall_nr not in data["rules"]["denied_syscalls"]:
-            data["rules"]["denied_syscalls"].append(syscall_nr)
+        if syscall_entry not in data["rules"]["denied_syscalls"]:
+            data["rules"]["denied_syscalls"].append(syscall_entry)
 
     data["metadata"]["last_modified"] = datetime.datetime.now().isoformat()
 
