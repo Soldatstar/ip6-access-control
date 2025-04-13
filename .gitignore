@@ -1,3 +1,14 @@
 env/
 demo/*
 !demo/*.c
+
+# Decision files
+*.log
+*.json
+
+# Demo files
+/user-tool/process-supervisor/
+/user-tool/process-supervisor/* 
+
+user-tool/__pycache__
+user-tool/__pycache__/*
