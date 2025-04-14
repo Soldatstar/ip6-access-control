@@ -102,6 +102,11 @@ def main():
         decision = simulate_syscall(client_sock, syscall_nr, program_name, program_hash, program_path)
         logger.info(f"Final decision for syscall {syscall_nr}: {decision}")
 
+        #simulate more syscalls as needed
+        syscall_nr = 43
+        decision = simulate_syscall(client_sock, syscall_nr, program_name, program_hash, program_path)
+        logger.info(f"Final decision for syscall {syscall_nr}: {decision}")
+
 
 if __name__ == "__main__":
     main()

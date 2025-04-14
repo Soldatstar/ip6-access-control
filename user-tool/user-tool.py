@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import datetime
+import shutil  # Add this import at the top of the file
 from logging_config import configure_logging
 from typing import Optional
 
@@ -48,7 +49,7 @@ def handle_connection(client_sock: socket.socket):
             syscall_nr, program_hash, program_name, program_path = request
 
             match input(f"[User-Tool] Allow operation for syscall {syscall_nr} (program: {program_name}, hash: {program_hash})? (y/n/1): ").strip().lower():
-                case "1":
+                case "1": # Allow for one time without saving
                     client_sock.sendall(b"ALLOW")
                     continue
                 case "y":
@@ -111,21 +112,89 @@ def save_decision(program_name: str, program_path: str, program_hash: str, sysca
     with open(policy_file, "w") as file:
         json.dump(data, file, indent=4)
 
+def list_known_apps():
+    """List all applications with known policies."""
+    if not os.path.exists(POLICIES_DIR):
+        print("No policies directory found.")
+        return
+
+    apps = os.listdir(POLICIES_DIR)
+    if not apps:
+        print("No known applications with policies.")
+    else:
+        print("Known applications with policies:")
+        for app in apps:
+            policy_file = os.path.join(POLICIES_DIR, app, "policy.json")
+            if os.path.exists(policy_file):
+                try:
+                    with open(policy_file, "r") as file:
+                        data = json.load(file)
+                        process_name = data.get("metadata", {}).get("process_name", "Unknown")
+                        print(f"- {process_name} (Hash: {app})")
+                except json.JSONDecodeError:
+                    print(f"- {app} (Invalid policy file)")
+            else:
+                print(f"- {app} (No policy file found)")
+
+def delete_all_policies():
+    """Delete all policies."""
+    if not os.path.exists(POLICIES_DIR):
+        print("No policies directory found.")
+        return
+
+    for app in os.listdir(POLICIES_DIR):
+        app_path = os.path.join(POLICIES_DIR, app)
+        if os.path.isdir(app_path):
+            try:
+                shutil.rmtree(app_path) 
+                print(f"Deleted policies for {app}.")
+            except Exception as e:
+                print(f"Failed to delete policies for {app}. Error: {e}")
+
+    print("All policies deleted.")
+
 def main():
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
 
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server_sock:
-        server_sock.bind(SOCKET_PATH)
-        server_sock.listen(5)
-        logger.info(f"Mock user-tool started. Listening on {SOCKET_PATH}")
+    while True:
+        os.system('clear')  # Clear the console
+        print("\nUser Tool Menu:")
+        print("1. Accept supervisor connection")
+        print("2. List Known Apps")
+        print("3. Delete All Policies")
+        print("4. Exit")
 
-        while True:
-            logger.info("Waiting for connection...")
-            client_sock, _ = server_sock.accept()
-            logger.info("Supervisor connected. Ready to handle requests.")
-            with client_sock:
-                handle_connection(client_sock)
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+            os.system('clear')
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server_sock:
+                server_sock.bind(SOCKET_PATH)
+                server_sock.listen(5)
+                logger.info(f"Mock user-tool started. Listening on {SOCKET_PATH}")
+
+                while True:
+                    logger.info("Waiting for connection...")
+                    client_sock, _ = server_sock.accept()
+                    logger.info("Supervisor connected. Ready to handle requests.")
+                    with client_sock:
+                        handle_connection(client_sock)
+                    break
+        elif choice == "2":
+            os.system('clear')
+            list_known_apps()
+            input("Press Enter to return to the menu...")
+        elif choice == "3":
+            os.system('clear')
+            delete_all_policies()
+            input("Press Enter to return to the menu...")
+        elif choice == "4":
+            os.system('clear')
+            print("Exiting User Tool.")
+            break
+        else:
+            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()
