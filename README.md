@@ -1,50 +1,46 @@
+# Linux Access Control Tool
 
-# 25FS_IMVS14: System zur feingranularen Ressourcen-Zugriffskontrolle unter Linux  
-## IP6 Bachelorarbeit  
+## Problematik:
 
-[Projektbeschreibung](25FS_IMVS14.pdf)  
+Linux bietet Möglichkeiten zur Kontrolle des Zugriffs auf Systemressourcen wie Dateien oder Netzwerkverbindungen (z.B. AppArmor, SELinux). Allerdings haben diese vorhandenen Mechanismen folgende Nachteile:
 
-### 📖 Projektzusammenfassung  
-**Zielsetzung:**  
-Entwicklung eines intuitiven Sicherheitssystems für Linux, das Endnutzern eine feingranulare Kontrolle über Programmzugriffe auf Systemressourcen (Dateien, Netzwerk, Hardware) ermöglicht. Durch Integration mit Linux Security Modules (LSM) wird eine benutzerfreundliche Abstraktionsebene über komplexe Mechanismen wie AppArmor, SELinux und eBPF geschaffen.
+* **Ungenauigkeit:**
+Die bestehenden Regeln erlauben oft nur sehr allgemeine Zugriffsbeschränkungen.
+* **Komplexität:**
+Die Einrichtung dieser Regeln erfordert spezialisiertes Wissen, und die Konfiguration ist statisch, d.h., sie ändert sich nicht dynamisch, während das Programm läuft.
+* **Mangelnde Benutzerinteraktion:**
+Benutzer werden nicht aktiv über Zugriffsversuche informiert und haben keine Möglichkeit, diese in der jeweiligen Situation zu erlauben oder zu verbieten.
 
-**Kernfunktionen:**  
-- Echtzeit-Überwachung von Systemcalls  
-- Interaktive Erlaubnisabfrage per User-Tool  
-- Dynamische Regelgenerierung mit Lernmodus  
-- Persistente Speicherung von Zugriffsprofilen  
-- Sandboxing kritischer Anwendungen  
+## Lösung:
 
-**Technologiestack:**  
-| Kategorie         | Technologien                 |
-|--------------------|-----------------------------|
-| Sicherheitslayer  | eBPF, AppArmor, Linux LSM   |
-| Systemprogramm.   | C, ...        |
-| UI                | CLI-Tools ...         |
-| Policy Management | JSON ...            |
+Linux Access Control ist ein benutzerfreundliches Werkzeug, mit dem Sie den Zugriff von Programmen auf Ressourcen unter Linux steuern können.
 
-**Herausforderungen:**  
-✓ Balance zwischen Sicherheit und Usability  
-✓ Low-Latency-Integration in Kernelprozesse  
-✓ Behandlung von Race Conditions  
-✓ Cross-Version-Kompatibilität der LSM  
+1. **Überwachung:** Das Programm überwacht, welche Systemaufrufe Programme verwenden, um auf wichtige Dateien zuzugreifen.
+2. **Benutzerkontrolle:** Wenn ein Programm versucht, auf eine kritische Datei zuzugreifen, werden Sie gefragt, ob dieser Zugriff erlaubt werden soll. Sie können den Zugriff erlauben oder dauerhaft für dieses Programm blockieren.
+3. **Verständliche Fragen:** Die Systemaufrufe und ihre Parameter werden in einfache Fragen übersetzt, damit Sie leicht entscheiden können, ob der Zugriff sinnvoll ist.
 
----
+## Benutzung:
 
-## 🛠️ Benutzung  
+Wird später beschrieben...
 
-### Workflow  
-1. **Detektion:** Supervisor erkennt kritische Systemaufrufe (open, connect, etc.)  
-2. **Intervention:** Prozess wird suspendiert bis zur Nutzerentscheidung  
-3. **Dialog:** User-Tool zeigt kontextbezogene Anfrage mit Risikobewertung  
-4. **Politik-Update:** Entscheidung wird regelbasiert persistiert  
+_Temporär_
 
-### Schnellstart  
+Terminal 1: (Wähle 1)
+
 ```bash
-# Build-Prozess
-cd scripts
-make all      # Kompiliert alle Komponenten
-sudo make test     # Führt Demoszenario aus
-make clean # Löschen der kompilierten Komponenten
+make create
+python3 user-tool/user-tool.py
 ```
 
+Terminal 2:
+
+```bash
+source env/bin/activate
+python3 user-tool/supervisor.py demo/file-access
+```
+
+Cleanup: 
+
+```bash
+make delete
+```
