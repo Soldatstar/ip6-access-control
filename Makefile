@@ -25,6 +25,8 @@ create:
 delete:
 	rm -rf $(VENV_DIR)
 	rm $(DEMOPROGRAM)
+	rm -r user-tool/__pycache__/
+	rm -r user-tool/process-supervisor/
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 

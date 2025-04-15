@@ -22,3 +22,25 @@ Linux Access Control ist ein benutzerfreundliches Werkzeug, mit dem Sie den Zugr
 ## Benutzung:
 
 Wird später beschrieben...
+
+_Temporär_
+
+Terminal 1: (Wähle 1)
+
+```bash
+make create
+python3 user-tool/user-tool.py
+```
+
+Terminal 2:
+
+```bash
+source env/bin/activate
+python3 user-tool/supervisor.py demo/file-access
+```
+
+Cleanup: 
+
+```bash
+make delete
+```

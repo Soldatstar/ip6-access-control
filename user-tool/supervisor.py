@@ -4,6 +4,11 @@ import socket
 from logging_config import configure_logging
 from typing import Optional
 
+from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent)
+from ptrace.debugger.child import createChild
+from ptrace.func_call import FunctionCallOptions
+from sys import stderr, argv, exit
+
 SOCKET_PATH = "/tmp/mock_user_tool.sock"
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), "process-supervisor")
@@ -76,9 +81,14 @@ def simulate_syscall(client_sock: socket.socket, syscall_nr: int, program_name: 
 
 
 def main():
-    # Mock data for testing
-    program_name = "mockApp"
-    program_hash = "mockhash1234567890abcdef"
+    # Überprüfe ob genau ein Programm übergeben wurde welches beobachtet werden soll
+    if len(argv) != 2:
+        print("Nutzung: %s program" % argv[0], file=stderr)
+        exit(1)
+
+    # TODO: hash and path needs to be calucated
+    program_name = argv[1:]
+    program_hash = "1234567890abcdef"
     program_path = "/usr/bin/mockApp"
 
     # Connect to user tool
@@ -91,22 +101,39 @@ def main():
             logger.error(f"Failed to connect to user-tool: {e}")
             logger.error("Make sure the user-tool is running!")
             return
+        
+        # Erstelle den Process, welcher beobachtet werden soll
+        pid = createChild(arguments=argv[1:], no_stdout=False, env=None)
+    
+        # Erstelle den Debugger und füge den Process dem Debugger hinzu
+        debugger = PtraceDebugger()
+        process = debugger.addProcess(pid=pid, is_attached=True)
+        
+        # Setze den ersten Systemaufruf Breakpoint 
+        process.syscall()
+        
+        # Der Debugger fängt Systemaufrufe auf, diese werden auf die Console geprinted und der nächste Systemaufruf Breakpoint wird gesetzt
+        while True:
+            try: 
+                event = debugger.waitSyscall()
+                state = event.process.syscall_state
+                syscall = state.event(FunctionCallOptions())
+    
+                # Nur wenn der Systemaufruf noch nicht ausgeführt wurde soll er angezeigt
+                # TODO: parameter for arguments = [arg.format() for arg in syscall.arguments] and syscall.name
+                if syscall.result is None:
+                    decision = simulate_syscall(client_sock, syscall.syscall, program_name, program_hash, program_path)
+                    logger.info(f"Final decision for syscall {syscall.syscall}: {decision}")
 
-        # Simulate syscall 41 (socket)
-        syscall_nr = 41
-        decision = simulate_syscall(client_sock, syscall_nr, program_name, program_hash, program_path)
-        logger.info(f"Final decision for syscall {syscall_nr}: {decision}")
-
-        # Simulate syscall 42 (connect)
-        syscall_nr = 42
-        decision = simulate_syscall(client_sock, syscall_nr, program_name, program_hash, program_path)
-        logger.info(f"Final decision for syscall {syscall_nr}: {decision}")
-
-        #simulate more syscalls as needed
-        syscall_nr = 43
-        decision = simulate_syscall(client_sock, syscall_nr, program_name, program_hash, program_path)
-        logger.info(f"Final decision for syscall {syscall_nr}: {decision}")
-
-
+                process.syscall()
+            except NewProcessEvent as event:
+                print("Prozess hat ein Kind-Prozess gestartet")
+                continue
+            except ProcessExit as event:
+                print("Prozess beendet")
+                break
+    
+    debugger.quit()
+    
 if __name__ == "__main__":
     main()
