@@ -26,10 +26,11 @@ def parse_request(data: str) -> Optional[tuple]:
     try:
         parts = data.split()
         syscall_nr = int(parts[0].split(":")[1])
-        program_hash = parts[1].split(":")[1]
-        program_name = parts[2].split(":")[1]
+        program_hash = parts[1].split(":")[1]  
+        program_name = parts[2].split(":")[1]  
         program_path = parts[3].split(":")[1]
-        return syscall_nr, program_hash, program_name, program_path
+        logger.info(f"Parsed request: syscall_nr={syscall_nr}, program_name={program_name}, program_hash={program_hash}, program_path={program_path}")
+        return syscall_nr, program_name, program_hash, program_path
     except (IndexError, ValueError):
         logger.error("Invalid request format")
         return None
@@ -46,7 +47,7 @@ def handle_connection(client_sock: socket.socket):
                 client_sock.sendall(b"DENY")
                 continue
 
-            syscall_nr, program_hash, program_name, program_path = request
+            syscall_nr, program_name, program_hash, program_path = request
 
             match input(f"[User-Tool] Allow operation for syscall {syscall_nr} (program: {program_name}, hash: {program_hash})? (y/n/1): ").strip().lower():
                 case "1": # Allow for one time without saving
@@ -69,6 +70,7 @@ def handle_connection(client_sock: socket.socket):
 def save_decision(program_name: str, program_path: str, program_hash: str, syscall_nr: int, decision: str, user: str = "user123", parameter: str = "parameter"):
     process_dir = os.path.join(POLICIES_DIR, program_hash)  
     os.makedirs(process_dir, exist_ok=True)
+    logger.info(f"Saving decision for {program_name} (hash: {program_hash}) in {process_dir}")
     policy_file = os.path.join(process_dir, "policy.json")
 
     # Handle empty or invalid policy files
@@ -180,7 +182,7 @@ def main():
                     logger.info("Supervisor connected. Ready to handle requests.")
                     with client_sock:
                         handle_connection(client_sock)
-                    break
+                    #break
         elif choice == "2":
             os.system('clear')
             list_known_apps()

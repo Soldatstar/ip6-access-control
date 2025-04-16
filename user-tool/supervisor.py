@@ -73,7 +73,7 @@ def simulate_syscall(client_sock: socket.socket, syscall_nr: int, program_name: 
     if decision:
         logger.info(f"Decision from policy file: {decision}")
         return decision  # Return the decision if found in the policy file
-
+    logger.info("No decision found in policy file, asking user tool...")
     # Ask user tool for permission if no decision is found in the policy file
     decision = get_decision_from_user_tool(client_sock, syscall_nr, program_name, program_hash, program_path)
     logger.info(f"Decision from user-tool: {decision}")
@@ -87,10 +87,10 @@ def main():
         exit(1)
 
     # TODO: hash and path needs to be calucated
-    program_name = argv[1:]
+    program_name = argv[1]
     program_hash = "1234567890abcdef"
     program_path = "/usr/bin/mockApp"
-
+    logger.info(f"Program name: {program_name}, hash: {program_hash}, path: {program_path}")
     # Connect to user tool
     logger.info("Connecting to user-tool...")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client_sock:
@@ -122,7 +122,9 @@ def main():
                 # Nur wenn der Systemaufruf noch nicht ausgeführt wurde soll er angezeigt
                 # TODO: parameter for arguments = [arg.format() for arg in syscall.arguments] and syscall.name
                 if syscall.result is None:
+
                     decision = simulate_syscall(client_sock, syscall.syscall, program_name, program_hash, program_path)
+
                     logger.info(f"Final decision for syscall {syscall.syscall}: {decision}")
 
                 process.syscall()
