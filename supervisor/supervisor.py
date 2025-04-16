@@ -33,7 +33,7 @@ def main():
                 
                 # TODO: Do Seccomp filtering according to decision
                 
-                # TODO: Add decision to cache  
+                # TODO: Add decision to the cache  
                 print(syscall.name)
             
             process.syscall()
