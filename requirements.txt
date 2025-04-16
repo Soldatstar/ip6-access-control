@@ -1,1 +1,2 @@
 python-ptrace==0.9.9
+pyzmq==26.4.0
