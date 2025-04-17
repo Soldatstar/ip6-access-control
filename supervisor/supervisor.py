@@ -1,7 +1,22 @@
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent)
 from ptrace.debugger.child import createChild
 from ptrace.func_call import FunctionCallOptions
+from pyseccomp import SyscallFilter, KILL, ALLOW
 from sys import stderr, argv, exit
+
+def seccomp(rule,syscall_name):
+    f = SyscallFilter(defaction=ALLOW)
+    
+    if rule == "ALLOW":
+        # f.add_rule(ALLOW, syscall_name)
+        print(f"SECCOMP ALLOW {syscall_name}")
+    
+    if rule == "DENY":
+        # f.add_rule(KILL, syscall_name)
+        print(f"SECCOMP DENY {syscall_name}")
+
+    # load the filter into the kernel
+    f.load()
 
 def ask_for_permission(syscall_formated):
     # TODO: Change here for communication whit user-tool using ZeroMQ
@@ -40,7 +55,8 @@ def main():
                 permission = ask_for_permission(syscall_formated=syscall.format())
 
                 # TODO: Do Seccomp filtering according to decision
-                
+                seccomp(rule=permission,syscall_name=syscall.name)
+
                 # TODO: Add decision to the cache  
                 
             process.syscall()
