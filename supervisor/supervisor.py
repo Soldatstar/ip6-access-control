@@ -3,6 +3,15 @@ from ptrace.debugger.child import createChild
 from ptrace.func_call import FunctionCallOptions
 from sys import stderr, argv, exit
 
+def ask_for_permission(syscall_formated):
+    # TODO: Change here for communication whit user-tool using ZeroMQ
+    while True:
+        permission = input(f"Systemcall '{syscall_formated}' (ALLOW,DENY): ")
+        if permission == 'ALLOW' or permission == 'DENY':
+            return permission
+        else:
+            print("Illegal input. Please choose ALLOW or DENY")
+
 def main():
     
     if len(argv) != 2:
@@ -28,14 +37,12 @@ def main():
             syscall = state.event(FunctionCallOptions())
     
             if syscall.result is None:
-                
-                # TODO: !!!If not in the cache!!!, send a req_decision to the ZeroMQ
-                
+                permission = ask_for_permission(syscall_formated=syscall.format())
+
                 # TODO: Do Seccomp filtering according to decision
                 
                 # TODO: Add decision to the cache  
-                print(syscall.name)
-            
+                
             process.syscall()
         except NewProcessEvent as event:
             print("Prozess hat ein Kind-Prozess gestartet")
