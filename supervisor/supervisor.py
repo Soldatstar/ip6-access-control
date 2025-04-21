@@ -2,7 +2,7 @@ from signal import SIGUSR1, SIGCHLD, SIG_IGN, signal
 from sys import stderr, argv, exit
 from os import environ
 
-from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent)
+from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
 from ptrace.debugger.child import createChild
 from ptrace.func_call import FunctionCallOptions
 
@@ -31,10 +31,11 @@ def main():
     )
     debugger = PtraceDebugger()
     process = debugger.addProcess(pid=pid, is_attached=True)
+    
     process.cont()
     event = process.waitSignals(SIGUSR1)   
     process.syscall()
-
+    
     while True:
         try: 
             event = debugger.waitSyscall()
@@ -48,10 +49,14 @@ def main():
                 print(syscall.format())  
             process.syscall()
         
+        except ProcessSignal as event: 
+            print(f"***SIGNAL {event.getSignalInfo}***")
+            break
+
         except NewProcessEvent as event:
             print("***CHILD-PROCESS***")
             continue
-        
+
         except ProcessExit as event:
             print("***PROCESS-EXECUTED***")
             break

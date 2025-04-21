@@ -2,20 +2,11 @@ from sys import stderr, argv, exit
 from os import execv, kill, getpid
 from signal import SIGUSR1
 
-from pyseccomp import SyscallFilter, KILL, ALLOW
+from pyseccomp import SyscallFilter, ALLOW, TRAP
 
-def seccomp(rule,syscall_name):
+def init_seccomp():
     f = SyscallFilter(defaction=ALLOW)
-    
-    if rule == "ALLOW":
-        # f.add_rule(ALLOW, syscall_name)
-        print(f"SECCOMP ALLOW {syscall_name}")
-    
-    if rule == "DENY":
-        # f.add_rule(KILL, syscall_name)
-        print(f"SECCOMP DENY {syscall_name}")
- 
-    # load the filter into the kernel
+    f.add_rule(TRAP, 'close')
     f.load()
 
 def main():
@@ -23,6 +14,7 @@ def main():
         print("Nutzung: %s program" % argv[0], file=stderr)
         exit(1)
     
+    init_seccomp()
     kill(getpid(),SIGUSR1)
     execv(argv[1],[argv[1]]+argv[2:])
     
