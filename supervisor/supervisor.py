@@ -1,10 +1,20 @@
-from signal import SIGUSR1, SIGCHLD, SIG_IGN, signal
 from sys import stderr, argv, exit
-from os import environ
+from os import execv
+from multiprocessing import Array, Event, Process
 
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
-from ptrace.debugger.child import createChild
 from ptrace.func_call import FunctionCallOptions
+from pyseccomp import SyscallFilter, ALLOW, TRAP
+
+def init_seccomp():
+    f = SyscallFilter(defaction=ALLOW)
+    #f.add_rule(TRAP, 'close')
+    f.load()
+
+def child_prozess(event,shared_memory,argv):
+    init_seccomp()
+    event.wait()
+    execv(argv[1],[argv[1]]+argv[2:])
 
 def ask_for_permission(syscall_formated):
     # TODO: Change here for communication whit user-tool using ZeroMQ
@@ -23,17 +33,16 @@ def main():
     # TODO: Connection to user-tool over ZeroMQ
 
     # TODO: Wait for read_db, store it into the cache, put the path of the program into the message 
-        
-    pid = createChild(
-        arguments=['python3','supervisor/monitor.py']+argv[1:],
-        no_stdout=True,
-        env=dict(environ)
-    )
-    debugger = PtraceDebugger()
-    process = debugger.addProcess(pid=pid, is_attached=True)
+    shared_memory = Array("i",1)
+    shared_memory[0] = 2
     
-    process.cont()
-    event = process.waitSignals(SIGUSR1)   
+    event = Event()
+    child = Process(target=child_prozess, args=(event, shared_memory,argv))
+    child.start()
+    debugger = PtraceDebugger()
+    process = debugger.addProcess(pid=child.pid, is_attached=False)
+    event.set()
+      
     process.syscall()
     
     while True:
@@ -45,8 +54,8 @@ def main():
             if syscall.result is None:
                 # TODO: Ask for permission and change the seccomp filter
                 # permission = ask_for_permission(syscall_formated=syscall.format())
-
                 print(syscall.format())  
+            
             process.syscall()
         
         except ProcessSignal as event: 
@@ -64,5 +73,4 @@ def main():
     debugger.quit()
     
 if __name__ == "__main__":
-    signal(SIGCHLD,SIG_IGN)
     main()
