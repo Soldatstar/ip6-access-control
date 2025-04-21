@@ -1,19 +1,22 @@
 from sys import stderr, argv, exit
 from os import execv
-from multiprocessing import Array, Event, Process
+from multiprocessing import Manager, Process
 
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
 from ptrace.func_call import FunctionCallOptions
-from pyseccomp import SyscallFilter, ALLOW, TRAP
+from pyseccomp import SyscallFilter, ALLOW, TRAP, Arg, EQ
 
-def init_seccomp():
+def init_seccomp(syscall_to_filter):
     f = SyscallFilter(defaction=ALLOW)
-    #f.add_rule(TRAP, 'close')
+    
+    for key in list(syscall_to_filter.keys()):
+        for i in range(len(syscall_to_filter[key])):
+            f.add_rule(TRAP, key, Arg(i, EQ, syscall_to_filter[key][i]))
+
     f.load()
 
-def child_prozess(event,shared_memory,argv):
-    init_seccomp()
-    event.wait()
+def child_prozess(shared_dict,argv):
+    init_seccomp(syscall_to_filter=shared_dict)
     execv(argv[1],[argv[1]]+argv[2:])
 
 def ask_for_permission(syscall_formated):
@@ -33,15 +36,14 @@ def main():
     # TODO: Connection to user-tool over ZeroMQ
 
     # TODO: Wait for read_db, store it into the cache, put the path of the program into the message 
-    shared_memory = Array("i",1)
-    shared_memory[0] = 2
+    manager = Manager()  
+    shared_dict = manager.dict()
+    shared_dict['read'] = [3]
     
-    event = Event()
-    child = Process(target=child_prozess, args=(event, shared_memory,argv))
+    child = Process(target=child_prozess, args=(shared_dict,argv))
     child.start()
     debugger = PtraceDebugger()
     process = debugger.addProcess(pid=child.pid, is_attached=False)
-    event.set()
       
     process.syscall()
     
@@ -71,6 +73,8 @@ def main():
             break
     
     debugger.quit()
+    child.join()
+    manager.shutdown() 
     
 if __name__ == "__main__":
     main()
