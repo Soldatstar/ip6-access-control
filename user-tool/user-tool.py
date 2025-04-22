@@ -2,15 +2,22 @@ import json
 import os
 import socket
 import datetime
-import shutil  # Add this import at the top of the file
+import shutil  
+import zmq
+import threading
+import queue
+import sys
+import select
 from logging_config import configure_logging
 from typing import Optional
-
-SOCKET_PATH = "/tmp/mock_user_tool.sock"
+import hashlib  
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), "process-supervisor")
 POLICIES_DIR = os.path.join(BASE_DIR, "policies")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
+
+REQUEST_QUEUE = queue.Queue()           # Queue to hold incoming requests
+NEW_REQUEST_EVENT = threading.Event()   # Event to signal new requests
 
 def ensure_directories_exist():
     os.makedirs(POLICIES_DIR, exist_ok=True)
@@ -21,51 +28,6 @@ ensure_directories_exist()
 # Configure logging
 log_file_path = os.path.join(LOGS_DIR, "user_tool.log")
 logger = configure_logging(log_file_path, "User-Tool")
-
-def parse_request(data: str) -> Optional[tuple]:
-    try:
-        parts = data.split()
-        syscall_nr = int(parts[0].split(":")[1])
-        program_hash = parts[1].split(":")[1]  
-        program_name = parts[2].split(":")[1]  
-        program_path = parts[3].split(":")[1]
-        logger.info(f"Parsed request: syscall_nr={syscall_nr}, program_name={program_name}, program_hash={program_hash}, program_path={program_path}")
-        return syscall_nr, program_name, program_hash, program_path
-    except (IndexError, ValueError):
-        logger.error("Invalid request format")
-        return None
-
-def handle_connection(client_sock: socket.socket):
-    while True:
-        try:
-            data = client_sock.recv(256).decode()
-            if not data:
-                break
-
-            request = parse_request(data)
-            if not request:
-                client_sock.sendall(b"DENY")
-                continue
-
-            syscall_nr, program_name, program_hash, program_path = request
-
-            match input(f"[User-Tool] Allow operation for syscall {syscall_nr} (program: {program_name}, hash: {program_hash})? (y/n/1): ").strip().lower():
-                case "1": # Allow for one time without saving
-                    client_sock.sendall(b"ALLOW")
-                    continue
-                case "y":
-                    response = "ALLOW"
-                case "n":
-                    response = "DENY"
-                case _:
-                    response = "DENY"
-            client_sock.sendall(response.encode())
-
-            save_decision(program_name, program_path, program_hash, syscall_nr, response)
-
-        except Exception as e:
-            logger.error(f"Error handling connection: {e}")
-            break
 
 def save_decision(program_name: str, program_path: str, program_hash: str, syscall_nr: int, decision: str, user: str = "user123", parameter: str = "parameter"):
     process_dir = os.path.join(POLICIES_DIR, program_hash)  
@@ -155,34 +117,114 @@ def delete_all_policies():
 
     print("All policies deleted.")
 
-def main():
-    if os.path.exists(SOCKET_PATH):
-        os.unlink(SOCKET_PATH)
+def zmq_listener():
+    """Background thread to listen for incoming ZeroMQ requests."""
+    context = zmq.Context()
+    socket = context.socket(zmq.ROUTER)  
+    socket.bind("tcp://*:5556")  
+    logger.info("ZeroMQ listener started on tcp://*:5556")
 
     while True:
-        os.system('clear')  # Clear the console
+        try:
+            # Receive message: [identity, delimiter, message]
+            identity, _, message = socket.recv_multipart()
+            logger.debug(f"Received request from {identity}: {message}")
+            try:
+                message = json.loads(message.decode())
+                REQUEST_QUEUE.put((socket, identity, message))  # Add the request to the queue
+                NEW_REQUEST_EVENT.set()                         # Signal that a new request has arrived
+            except json.JSONDecodeError:
+                logger.error("Failed to decode JSON message")
+                socket.send_multipart([identity, b'', json.dumps({"error": "Invalid JSON"}).encode()])
+        except zmq.ZMQError as e:
+            logger.error(f"ZeroMQ error: {e}")
+            break
+
+def handle_requests():
+    """Handle requests from the queue."""
+    while not REQUEST_QUEUE.empty():
+        socket, identity, message = REQUEST_QUEUE.get()
+        
+        # Extract fields from the new message format
+        if message.get("type") == "req_decision" and "body" in message:
+            body = message["body"]
+            program_path = body.get("program")
+            syscall_nr = body.get("syscall_id")
+            parameter = body.get("parameter", "no_parameter")
+
+            # Calculate the hash of the program path
+            program_hash = hashlib.sha256(program_path.encode()).hexdigest()
+
+            # Extract the program name from the path
+            program_name = os.path.basename(program_path)
+        else:
+            # Handle invalid message format
+            logger.error("Invalid message format")
+            error_response = {
+                "status": "error",
+                "data": {"message": "Invalid message format"}
+            }
+            socket.send_multipart([identity, b'', json.dumps(error_response).encode()])
+            continue
+
+        response = None
+        match input(f"[User-Tool] Allow operation for syscall {syscall_nr} (program: {program_name}, hash: {program_hash})? (y/n/1): ").strip().lower():
+            case "1":  # Allow for one time without saving
+                response = "ALLOW"
+            case "y":
+                response = "ALLOW"
+                save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+            case "n":
+                response = "DENY"
+                save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+            case _:
+                response = "DENY"
+
+        # Send the response back to the requester in the specified format
+        success_response = {
+            "status": "success",
+            "data": {"decision": response}
+        }
+        socket.send_multipart([identity, b'', json.dumps(success_response).encode()])
+
+    NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
+
+def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:
+    """Simulate non-blocking input with a timeout."""
+    print(prompt, end='', flush=True)
+    ready, _, _ = select.select([sys.stdin], [], [], timeout)
+    if ready:
+        return sys.stdin.readline().strip()
+    return None
+
+def main():
+    # Start the ZeroMQ listener in a background thread
+    listener_thread = threading.Thread(target=zmq_listener, daemon=True)
+    listener_thread.start()
+
+    while True:
+        #os.system('clear')  # Clear the console
         print("\nUser Tool Menu:")
-        print("1. Accept supervisor connection")
+        print("1. Handle Pending Requests")
         print("2. List Known Apps")
         print("3. Delete All Policies")
         print("4. Exit")
 
-        choice = input("Enter your choice: ").strip()
+        print("\nWaiting for user input...")
+        while not NEW_REQUEST_EVENT.is_set():
+            choice = non_blocking_input("")
+            if choice:
+                break
+
+        if NEW_REQUEST_EVENT.is_set():
+            print("\n[Notification] New request received! Handling it now...")
+            handle_requests()
+            continue
 
         if choice == "1":
             os.system('clear')
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server_sock:
-                server_sock.bind(SOCKET_PATH)
-                server_sock.listen(5)
-                logger.info(f"Mock user-tool started. Listening on {SOCKET_PATH}")
-
-                while True:
-                    logger.info("Waiting for connection...")
-                    client_sock, _ = server_sock.accept()
-                    logger.info("Supervisor connected. Ready to handle requests.")
-                    with client_sock:
-                        handle_connection(client_sock)
-                    #break
+            handle_requests()
+            input("Press Enter to return to the menu...")
         elif choice == "2":
             os.system('clear')
             list_known_apps()

@@ -4,18 +4,21 @@
 ```json
 {
     "type": "read_db",
-    "body": {}
+    "body": {
+    	"program": "/home/user/file-access"
+    }
 }
 ```
 
 ## Request für abgefangene Syscalls ohne bestehende Policy
 ```json
 {
-    "type": "req_decision",
-    "body": {
-        "syscall_id": 123,
-        "parameter": "some_parameter"
-    }
+   "type":"req_decision",
+   "body":{
+      "program":"/home/user/file-access",
+      "syscall_id":123,
+      "parameter":"some_parameter"
+   }
 }
 ```
 

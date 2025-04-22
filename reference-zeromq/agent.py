@@ -36,6 +36,7 @@ try:
                 }
             }    
         x = random.choice([x, y])    
+        print(f" \n [Agent] Sending: {json.dumps(x)}")
         socket.send_multipart([b'', json.dumps(x).encode()])
         time.sleep(5)
 except KeyboardInterrupt:
