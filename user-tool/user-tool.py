@@ -146,6 +146,7 @@ def handle_requests():
         
         # Extract fields from the new message format
         if message.get("type") == "req_decision" and "body" in message:
+            logger.info("Received req_decision request")
             body = message["body"]
             program_path = body.get("program")
             syscall_nr = body.get("syscall_id")
@@ -156,6 +157,32 @@ def handle_requests():
 
             # Extract the program name from the path
             program_name = os.path.basename(program_path)
+
+        elif message.get("type") == "read_db" and "body" in message:
+            logger.info("Received read_db request")
+            body = message["body"]
+            program_path = body.get("program")
+            program_hash = hashlib.sha256(program_path.encode()).hexdigest()
+            #read policy file if it exists
+            policy_file = os.path.join(POLICIES_DIR, program_hash, "policy.json")
+            response = None;
+            if os.path.exists(policy_file):
+                with open(policy_file, "r") as file:
+                    data = json.load(file)
+                    print(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
+                    rules = data.get("rules", {}) 
+                    response = {
+                        "status": "success",
+                        "data": rules
+                    }
+            else:
+                print(f"No policy found for {program_hash}")
+                response = {
+                    "status": "error",
+                    "data": {"message": "No policy found"}
+                }
+            socket.send_multipart([identity, b'', json.dumps(response).encode()])
+            continue
         else:
             # Handle invalid message format
             logger.error("Invalid message format")

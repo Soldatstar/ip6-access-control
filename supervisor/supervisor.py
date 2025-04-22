@@ -51,6 +51,17 @@ def ask_for_permission_zmq(syscall_formated, socket):
     }
     print(f" \n [Supervisor] Sending: {json.dumps(message)}")
     socket.send_multipart([b'', json.dumps(message).encode()])  
+    try:
+        while True:
+                _, response = socket.recv_multipart()
+                response_data = json.loads(response.decode())
+                print("Received response from user-tool:", response_data)
+                break
+    except KeyboardInterrupt:
+        print("Exiting supervisor...")
+    finally:
+        socket.close()
+
 
 def main():
     if len(argv) != 2:
@@ -101,6 +112,8 @@ def main():
     debugger.quit()
     child.join()
     manager.shutdown() 
+    socket.close()
+    
     
 if __name__ == "__main__":
     main()
