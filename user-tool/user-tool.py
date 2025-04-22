@@ -9,7 +9,6 @@ import queue
 import sys
 import select
 from logging_config import configure_logging
-from typing import Optional
 import hashlib  
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), "process-supervisor")
