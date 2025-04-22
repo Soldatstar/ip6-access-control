@@ -28,7 +28,25 @@ Reply enthält entweder ALLOW/DENY oder die bestehende Policy für `read_db`.
 ```json
 {
     "status": "success",  // für Fehlerbehandlung, falls Request nicht verstanden wurde sollte "error" gesendet werden, evtl. im data eine Message?
-    "data": {}            // Response data (if any)
+    "data": { "decision" : "ALLOW" }            // Response data (if any)
 }
 ```
-
+policy reply
+```json
+{
+   "status":"success",
+   "data":{
+      "rules":{
+         "allowed_syscalls":[
+            [
+               123,
+               "some_parameter"
+            ]
+         ],
+         "denied_syscalls":[
+            
+         ]
+      }
+   }
+}
+```
