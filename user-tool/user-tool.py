@@ -231,10 +231,9 @@ def main():
     while True:
         #os.system('clear')  # Clear the console
         print("\nUser Tool Menu:")
-        print("1. Handle Pending Requests")
-        print("2. List Known Apps")
-        print("3. Delete All Policies")
-        print("4. Exit")
+        print("1. List Known Apps")
+        print("2. Delete All Policies")
+        print("3. Exit")
 
         print("\nWaiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
@@ -247,19 +246,15 @@ def main():
             handle_requests()
             continue
 
-        if choice == "1":
-            os.system('clear')
-            handle_requests()
-            input("Press Enter to return to the menu...")
-        elif choice == "2":
+        elif choice == "1":
             os.system('clear')
             list_known_apps()
             input("Press Enter to return to the menu...")
-        elif choice == "3":
+        elif choice == "2":
             os.system('clear')
             delete_all_policies()
             input("Press Enter to return to the menu...")
-        elif choice == "4":
+        elif choice == "3":
             os.system('clear')
             print("Exiting User Tool.")
             break
