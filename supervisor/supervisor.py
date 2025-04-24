@@ -1,5 +1,5 @@
 from sys import stderr, argv, exit
-from os import execv
+from os import execv, path
 from multiprocessing import Manager, Process
 
 import zmq
@@ -9,6 +9,8 @@ from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessS
 from ptrace.func_call import FunctionCallOptions
 from pyseccomp import SyscallFilter, ALLOW, TRAP, Arg, EQ
 
+PROGRAM_RELATIVE_PATH = None
+PROGRAM_ABSOLUTE_PATH = None
 
 def init_seccomp(syscall_to_filter):
     f = SyscallFilter(defaction=ALLOW)
@@ -23,30 +25,19 @@ def child_prozess(shared_dict,argv):
     init_seccomp(syscall_to_filter=shared_dict)
     execv(argv[1],[argv[1]]+argv[2:])
 
-def ask_for_permission(syscall_formated):
-    # TODO: Change here for communication whit user-tool using ZeroMQ -> see ask_for_permission_zmq
-    while True:
-        permission = input(f"Systemcall '{syscall_formated}' (ALLOW,DENY): ")
-        if permission == 'ALLOW' or permission == 'DENY':
-            return permission
-        else:
-            print("Illegal input. Please choose ALLOW or DENY")
-
 def setup_zmq() -> zmq.Socket:
     context = zmq.Context()
     socket = context.socket(zmq.DEALER)
     socket.connect("tcp://localhost:5556")
     return socket
 
-def ask_for_permission_zmq(syscall_formated, socket):
-
-    # TODO: extract program name, syscall_id and parameter from the message
+def ask_for_permission_zmq(syscall, socket):
     message = {
         "type": "req_decision",
         "body": {
-            "program": "/home/user/file-access",
-            "syscall_id": syscall_formated,
-            "parameter": "some_parameter"
+            "program": PROGRAM_ABSOLUTE_PATH,
+            "syscall_id": syscall.syscall,
+            "parameter": [arg.format() for arg in syscall.arguments]
         }
     }
     print(f" \n [Supervisor] Sending: {json.dumps(message)}")
@@ -62,13 +53,17 @@ def ask_for_permission_zmq(syscall_formated, socket):
     finally:
         socket.close()
 
+def set_program_path(relative_path):
+    global PROGRAM_RELATIVE_PATH, PROGRAM_ABSOLUTE_PATH
+    PROGRAM_RELATIVE_PATH = relative_path
+    PROGRAM_ABSOLUTE_PATH = path.abspath(PROGRAM_RELATIVE_PATH)
 
 def main():
     if len(argv) != 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
         exit(1)
 
-    # TODO: Connection to user-tool over ZeroMQ
+    set_program_path(argv[1])
     socket = setup_zmq()
 
     # TODO: Wait for read_db, store it into the cache, put the path of the program into the message 
@@ -79,6 +74,7 @@ def main():
     child = Process(target=child_prozess, args=(shared_dict,argv))
     child.start()
     debugger = PtraceDebugger()
+    debugger.traceFork()
     process = debugger.addProcess(pid=child.pid, is_attached=False)
       
     process.syscall()
@@ -93,16 +89,20 @@ def main():
                 # TODO: Ask for permission and change the seccomp filter
                 # permission = ask_for_permission(syscall_formated=syscall.format())
                 print(syscall.format())  
-                ask_for_permission_zmq(syscall.format(), socket)
+                ask_for_permission_zmq(syscall, socket)
             
             process.syscall()
         
         except ProcessSignal as event: 
-            print(f"***SIGNAL {event.getSignalInfo}***")
+            print(f"***SIGNAL***")
+            event.display()
             break
 
         except NewProcessEvent as event:
             print("***CHILD-PROCESS***")
+            # TODO: Observe the Child with the debugger
+            subprocess = event.process
+            subprocess.parent.syscall()
             continue
 
         except ProcessExit as event:
