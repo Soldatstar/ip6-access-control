@@ -12,7 +12,8 @@ from pyseccomp import SyscallFilter, ALLOW, TRAP, Arg, EQ
 PROGRAM_RELATIVE_PATH = None
 PROGRAM_ABSOLUTE_PATH = None
 MANAGER = Manager()
-SHARED_DICTINARY = MANAGER.dict()
+ALLOW_LIST = MANAGER.list()
+DENY_LIST = MANAGER.list()
 
 def init_seccomp(syscall_to_filter):
     f = SyscallFilter(defaction=ALLOW)
@@ -23,8 +24,9 @@ def init_seccomp(syscall_to_filter):
 
     f.load()
 
-def child_prozess(shared_dict, argv):
-    init_seccomp(syscall_to_filter=shared_dict)
+def child_prozess(allow_list, deny_list, argv):
+    # TODO: Give both lists to seccomp and adjust the filter
+    init_seccomp(syscall_to_filter={})
     execv(argv[1],[argv[1]]+argv[2:])
 
 def setup_zmq() -> zmq.Socket:
@@ -53,10 +55,35 @@ def set_program_path(relative_path):
     PROGRAM_RELATIVE_PATH = relative_path
     PROGRAM_ABSOLUTE_PATH = path.abspath(PROGRAM_RELATIVE_PATH)
 
-def init_shared_dict(socket):
-    # TODO: Send read_db message and initialize shared dictionary
-    global SHARED_DICTINARY
-    SHARED_DICTINARY['read'] = [3]
+def init_shared_list(socket):
+    global ALLOW_LIST, DENY_LIST
+    message = {
+        "type": "read_db",
+        "body": {
+            "program": PROGRAM_ABSOLUTE_PATH
+        }
+    }
+    socket.send_multipart([b'', json.dumps(message).encode()])  
+    while True:
+        _, response = socket.recv_multipart()
+        response_data = json.loads(response.decode())
+
+        if response_data['status'] == "success":
+            for syscall in response_data['data']['allowed_syscalls']:
+                syscall_number = syscall[0]
+                syscall_args = syscall[1]
+                combined_array = [syscall_number] + syscall_args
+                ALLOW_LIST.append(combined_array)
+        
+            for syscall in response_data['data']['denied_syscalls']:
+                syscall_number = syscall[0]
+                syscall_args = syscall[1]
+                combined_array = [syscall_number] + syscall_args
+                DENY_LIST.append(combined_array)
+
+            break    
+        elif response_data['status'] == "error":
+            break
 
 def main():
     if len(argv) != 2:
@@ -65,9 +92,9 @@ def main():
 
     set_program_path(relative_path=argv[1])
     socket = setup_zmq() 
-    init_shared_dict(socket=socket)
-    
-    child = Process(target=child_prozess, args=(SHARED_DICTINARY,argv))
+    init_shared_list(socket=socket)
+
+    child = Process(target=child_prozess, args=(ALLOW_LIST,DENY_LIST,argv))
     child.start()
     debugger = PtraceDebugger()
     debugger.traceFork()
@@ -83,18 +110,24 @@ def main():
             syscall = state.event(FunctionCallOptions())
     
             if syscall.result is None:
+                syscall_number = syscall.syscall
+                syscall_args = [arg.format() for arg in syscall.arguments]
+                combined_array = [syscall_number] + syscall_args
+                
+                # TODO: only ask if it's not in the ALLOW or DENY List
                 decision = ask_for_permission_zmq(syscall=syscall, socket=socket)
                 
                 if decision == "ALLOW":
-                    #TODO: Safe the decision in the SHARED_DICTINARY and continue
-                    print(f"Decision: ALLOW for syscall: {syscall.format()}")
-
+                    print(f"Decision: ALLOW, Prozess continues. Syscall: {syscall.format()}")
+                    ALLOW_LIST.append(combined_array)
+                    
                 if decision == "DENY":
-                    # TODO: Find another solution than SIGKILL for this problem
-                    print(f"Decision: DENY for syscall: {syscall.format()}")
+                    print(f"Decision: DENY, Prozess receives \"operation denied.\" Syscall: {syscall.format()}")
+                    DENY_LIST.append(combined_array)
+                    # TODO: Write into regs operation denied
                     kill(child.pid, SIGKILL)
                     break
-            
+
             process.syscall()
 
         except ProcessSignal as event: 
