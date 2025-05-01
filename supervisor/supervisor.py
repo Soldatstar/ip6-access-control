@@ -1,8 +1,8 @@
 import zmq
 import json
 from sys import stderr, argv, exit
-from os import execv, path, kill
-from signal import SIGKILL
+from os import execv, path, kill, getpid
+from signal import SIGKILL, SIGUSR1
 from multiprocessing import Manager, Process
 
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
@@ -27,6 +27,7 @@ def init_seccomp(syscall_to_filter):
 def child_prozess(allow_list, deny_list, argv):
     # TODO: Give both lists to seccomp and adjust the filter
     init_seccomp(syscall_to_filter={})
+    kill(getpid(),SIGUSR1)
     execv(argv[1],[argv[1]]+argv[2:])
 
 def setup_zmq() -> zmq.Socket:
@@ -95,12 +96,13 @@ def main():
     init_shared_list(socket=socket)
 
     child = Process(target=child_prozess, args=(ALLOW_LIST,DENY_LIST,argv))
-    child.start()
     debugger = PtraceDebugger()
     debugger.traceFork()
+    child.start()
     process = debugger.addProcess(pid=child.pid, is_attached=False)
-
-    # TODO: Start once seccomp is set, because now also seccomp syscalls going to user-tool  
+     
+    process.cont()
+    event = process.waitSignals(SIGUSR1)  
     process.syscall()
     
     while True:
