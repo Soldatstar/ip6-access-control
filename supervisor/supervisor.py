@@ -5,6 +5,8 @@ from os import execv, path, kill, getpid
 from signal import SIGKILL, SIGUSR1
 from errno import EPERM
 from multiprocessing import Manager, Process
+from itertools import chain
+from collections import Counter
 
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
 from ptrace.func_call import FunctionCallOptions
@@ -88,6 +90,13 @@ def init_shared_list(socket):
         elif response_data['status'] == "error":
             break
 
+def is_already_decided(syscall_nr, arguments):
+    for decision in chain(ALLOW_LIST, DENY_LIST):
+        if decision[0] == syscall_nr:
+            if Counter(decision[1:]) == Counter(arguments):
+                return True
+    return False
+
 def main():
     if len(argv) < 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
@@ -118,21 +127,20 @@ def main():
                 syscall_args = [arg.format() for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args
                 
-                # TODO: only ask if it's not in the ALLOW or DENY List
-                decision = ask_for_permission_zmq(syscall=syscall, socket=socket)
+                if not is_already_decided(syscall_nr=syscall_number,arguments=syscall_args):
+                    decision = ask_for_permission_zmq(syscall=syscall, socket=socket)
                 
-                if decision == "ALLOW":
-                    print(f"Decision: ALLOW, Prozess continues. Syscall: {syscall.format()}")
-                    ALLOW_LIST.append(combined_array)
+                    if decision == "ALLOW":
+                        print(f"Decision: ALLOW Syscall: {syscall.format()}")
+                        ALLOW_LIST.append(combined_array)
                     
-                if decision == "DENY":
-                    print(f"Decision: DENY, Prozess receives \"operation denied.\" Syscall: {syscall.format()}")
-                    DENY_LIST.append(combined_array)
-                    process.setreg('orig_rax',-EPERM)
-                    process.syscall()
-                    debugger.waitSyscall()
-                    process.setreg('rax',-EPERM)
-                    break
+                    if decision == "DENY":
+                        print(f"Decision: DENY Syscall: {syscall.format()}")
+                        DENY_LIST.append(combined_array)
+                        process.setreg('orig_rax',-EPERM)
+                        process.syscall()
+                        debugger.waitSyscall()
+                        process.setreg('rax',-EPERM)
                     
             process.syscall()
 
