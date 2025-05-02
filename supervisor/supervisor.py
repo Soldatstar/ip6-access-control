@@ -3,6 +3,7 @@ import json
 from sys import stderr, argv, exit
 from os import execv, path, kill, getpid
 from signal import SIGKILL, SIGUSR1
+from errno import EPERM
 from multiprocessing import Manager, Process
 
 from ptrace.debugger import (PtraceDebugger,ProcessExit,NewProcessEvent,ProcessSignal)
@@ -42,6 +43,7 @@ def ask_for_permission_zmq(syscall, socket) -> str:
         "body": {
             "program": PROGRAM_ABSOLUTE_PATH,
             "syscall_id": syscall.syscall,
+            "syscall_name": syscall.name,
             "parameter": [arg.format() for arg in syscall.arguments]
         }
     }
@@ -87,7 +89,7 @@ def init_shared_list(socket):
             break
 
 def main():
-    if len(argv) != 2:
+    if len(argv) < 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
         exit(1)
 
@@ -126,10 +128,12 @@ def main():
                 if decision == "DENY":
                     print(f"Decision: DENY, Prozess receives \"operation denied.\" Syscall: {syscall.format()}")
                     DENY_LIST.append(combined_array)
-                    # TODO: Write into regs operation denied
-                    kill(child.pid, SIGKILL)
+                    process.setreg('orig_rax',-EPERM)
+                    process.syscall()
+                    debugger.waitSyscall()
+                    process.setreg('rax',-EPERM)
                     break
-
+                    
             process.syscall()
 
         except ProcessSignal as event: 
