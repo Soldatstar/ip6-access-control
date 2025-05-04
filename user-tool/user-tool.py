@@ -150,6 +150,7 @@ def handle_requests():
             body = message["body"]
             program_path = body.get("program")
             syscall_nr = body.get("syscall_id")
+            syscall_name= body.get("syscall_name")
             parameter = body.get("parameter", "no_parameter")
 
             # Calculate the hash of the program path
@@ -194,7 +195,7 @@ def handle_requests():
             continue
 
         response = None
-        match input(f"[User-Tool] Allow operation for syscall {syscall_nr} (program: {program_name}, hash: {program_hash})? (y/n/1): ").strip().lower():
+        match input(f"[User-Tool] Allow operation for syscall {syscall_name} (program: {program_name}, parameter: {parameter})? (y/n/1): ").strip().lower():
             case "1":  # Allow for one time without saving
                 response = "ALLOW"
             case "y":
