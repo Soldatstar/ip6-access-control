@@ -79,14 +79,14 @@ def save_decision(program_name: str, program_path: str, program_hash: str, sysca
 def list_known_apps():
     """List all applications with known policies."""
     if not os.path.exists(POLICIES_DIR):
-        print("No policies directory found.")
+        logger.info("No policies directory found.")
         return
 
     apps = os.listdir(POLICIES_DIR)
     if not apps:
-        print("No known applications with policies.")
+        logger.info("No known applications with policies.")
     else:
-        print("Known applications with policies:")
+        logger.info("Known applications with policies:")
         for app in apps:
             policy_file = os.path.join(POLICIES_DIR, app, "policy.json")
             if os.path.exists(policy_file):
@@ -94,16 +94,16 @@ def list_known_apps():
                     with open(policy_file, "r") as file:
                         data = json.load(file)
                         process_name = data.get("metadata", {}).get("process_name", "Unknown")
-                        print(f"- {process_name} (Hash: {app})")
+                        logger.info(f"- {process_name} (Hash: {app})")
                 except json.JSONDecodeError:
-                    print(f"- {app} (Invalid policy file)")
+                    logger.warning(f"- {app} (Invalid policy file)")
             else:
-                print(f"- {app} (No policy file found)")
+                logger.warning(f"- {app} (No policy file found)")
 
 def delete_all_policies():
     """Delete all policies."""
     if not os.path.exists(POLICIES_DIR):
-        print("No policies directory found.")
+        logger.info("No policies directory found.")
         return
 
     for app in os.listdir(POLICIES_DIR):
@@ -111,11 +111,11 @@ def delete_all_policies():
         if os.path.isdir(app_path):
             try:
                 shutil.rmtree(app_path) 
-                print(f"Deleted policies for {app}.")
+                logger.info(f"Deleted policies for {app}.")
             except Exception as e:
-                print(f"Failed to delete policies for {app}. Error: {e}")
+                logger.error(f"Failed to delete policies for {app}. Error: {e}")
 
-    print("All policies deleted.")
+    logger.info("All policies deleted.")
 
 def zmq_listener():
     """Background thread to listen for incoming ZeroMQ requests."""
@@ -173,20 +173,20 @@ def handle_requests():
                 with open(policy_file, "r") as file:
                     try:
                         data = json.load(file)
-                        print(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
+                        logger.debug(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
                         rules = data.get("rules", {})
                         response = {
                             "status": "success",
                             "data": rules
                         }
                     except json.JSONDecodeError:
-                        print(f"Policy file for {program_hash} is invalid.")
+                        logger.error(f"Policy file for {program_hash} is invalid.")
                         response = {
                             "status": "error",
                             "data": {"message": "Invalid policy file"}
                         }
             else:
-                print(f"No policy found for {program_hash}")
+                logger.info(f"No policy found for {program_hash}")
                 response = {
                     "status": "error",
                     "data": {"message": "No policy found"}
@@ -243,7 +243,7 @@ def ask_permission(syscall_nr, program_name, program_hash):
 
     def ask_cli():
         prompt = (
-            f"\nAllow operation for syscall {syscall_nr}?\n"
+            f"Allow operation for syscall {syscall_nr}?\n"
             f"Program: {program_name}\n"
             f"Hash: {program_hash}\n"
             "( (y)es / (n)o / (o)ne ): "
@@ -254,9 +254,7 @@ def ask_permission(syscall_nr, program_name, program_hash):
             'one': 'ONE_TIME','o': 'ONE_TIME',
         }
 
-        # print once
-        sys.stdout.write(prompt)
-        sys.stdout.flush()
+        logger.info(prompt)
 
         # poll stdin until GUI decision or valid CLI answer
         while decision['value'] is None:
@@ -319,36 +317,38 @@ def main():
 
     while True:
         #os.system('clear')  # Clear the console
-        print("\nUser Tool Menu:")
-        print("1. List Known Apps")
-        print("2. Delete All Policies")
-        print("3. Exit")
+        logger.info("User Tool Menu:")
+        logger.info("1. List Known Apps")
+        logger.info("2. Delete All Policies")
+        logger.info("3. Exit")
 
-        print("\nWaiting for user input...")
+        logger.info("Waiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
             choice = non_blocking_input("")
             if choice:
                 break
 
         if NEW_REQUEST_EVENT.is_set():
-            print("\n[Notification] New request received! Handling it now...")
+            logger.info("\n[Notification] New request received! Handling it now...")
             handle_requests()
             continue
 
         elif choice == "1":
             os.system('clear')
+            logger.info("Listing known apps...")
             list_known_apps()
             input("Press Enter to return to the menu...")
         elif choice == "2":
             os.system('clear')
+            logger.info("Deleting all policies...")
             delete_all_policies()
             input("Press Enter to return to the menu...")
         elif choice == "3":
             os.system('clear')
-            print("Exiting User Tool.")
+            logger.info("Exiting User Tool.")
             break
         else:
-            print("Invalid choice. Please try again.")
+            logger.warning("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()
