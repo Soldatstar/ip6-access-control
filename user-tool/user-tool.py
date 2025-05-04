@@ -8,6 +8,7 @@ import threading
 import queue
 import sys
 import select
+import tkinter as tk
 from logging_config import configure_logging
 import hashlib  
 
@@ -166,16 +167,24 @@ def handle_requests():
             program_hash = hashlib.sha256(program_path.encode()).hexdigest()
             #read policy file if it exists
             policy_file = os.path.join(POLICIES_DIR, program_hash, "policy.json")
-            response = None;
-            if os.path.exists(policy_file):
+
+            response = None
+            if os.path.exists(policy_file) and os.path.getsize(policy_file) > 0:
                 with open(policy_file, "r") as file:
-                    data = json.load(file)
-                    print(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
-                    rules = data.get("rules", {}) 
-                    response = {
-                        "status": "success",
-                        "data": rules
-                    }
+                    try:
+                        data = json.load(file)
+                        print(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
+                        rules = data.get("rules", {})
+                        response = {
+                            "status": "success",
+                            "data": rules
+                        }
+                    except json.JSONDecodeError:
+                        print(f"Policy file for {program_hash} is invalid.")
+                        response = {
+                            "status": "error",
+                            "data": {"message": "Invalid policy file"}
+                        }
             else:
                 print(f"No policy found for {program_hash}")
                 response = {
@@ -193,16 +202,15 @@ def handle_requests():
             }
             socket.send_multipart([identity, b'', json.dumps(error_response).encode()])
             continue
+        logger.info(f"Handling request for {program_name} (hash: {program_hash})")
+        response = ask_permission(syscall_nr, program_name, program_hash)
 
-        response = None
-        match input(f"[User-Tool] Allow operation for syscall {syscall_name} (program: {program_name}, parameter: {parameter})? (y/n/1): ").strip().lower():
-            case "1":  # Allow for one time without saving
+        match response:
+            case "ONE_TIME":  # Allow for one time without saving
                 response = "ALLOW"
-            case "y":
-                response = "ALLOW"
+            case "ALLOW":
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
-            case "n":
-                response = "DENY"
+            case "DENY":
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case _:
                 response = "DENY"
@@ -215,6 +223,86 @@ def handle_requests():
         socket.send_multipart([identity, b'', json.dumps(success_response).encode()])
 
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
+
+def ask_permission(syscall_nr, program_name, program_hash):
+    decision = {'value': None}
+    q = queue.Queue()
+    after_id = None
+
+    def set_decision(choice):
+        nonlocal after_id
+        if decision['value'] is None:
+            decision['value'] = choice
+            # cancel any pending poll_queue callback
+            if after_id is not None:
+                try:
+                    root.after_cancel(after_id)
+                except tk.TclError:
+                    pass
+            root.destroy()
+
+    def ask_cli():
+        prompt = (
+            f"\nAllow operation for syscall {syscall_nr}?\n"
+            f"Program: {program_name}\n"
+            f"Hash: {program_hash}\n"
+            "( (y)es / (n)o / (o)ne ): "
+        )
+        mapping = {
+            'yes': 'ALLOW',   'y': 'ALLOW',
+            'no':  'DENY',    'n': 'DENY',
+            'one': 'ONE_TIME','o': 'ONE_TIME',
+        }
+
+        # print once
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+
+        # poll stdin until GUI decision or valid CLI answer
+        while decision['value'] is None:
+            r, _, _ = select.select([sys.stdin], [], [], 4.0)
+            if r:
+                ans = sys.stdin.readline().strip().lower()
+                choice = mapping.get(ans)
+                if choice:
+                    q.put(choice)
+                    break
+
+    def poll_queue():
+        nonlocal after_id
+        try:
+            choice = q.get_nowait()
+        except queue.Empty:
+            # schedule next poll
+            after_id = root.after(100, poll_queue)
+        else:
+            set_decision(choice)
+
+    root = tk.Tk()
+    root.title("Permission Request")
+    root.geometry("400x150")
+
+    lbl = tk.Label(
+        root,
+        text=(
+            f"Allow operation for syscall {syscall_nr}?\n"
+            f"Program: {program_name}\n"
+            f"Hash: {program_hash}"
+        ),
+        wraplength=350
+    )
+    lbl.pack(pady=20)
+
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(pady=10)
+    for txt, val in [("Allow","ALLOW"), ("Deny","DENY"), ("One Time","ONE_TIME")]:
+        tk.Button(btn_frame, text=txt, width=10,
+                  command=lambda v=val: set_decision(v)).pack(side=tk.LEFT, padx=5)
+
+    threading.Thread(target=ask_cli, daemon=True).start()
+    after_id = root.after(100, poll_queue)
+
+    root.mainloop()
 
 def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:
     """Simulate non-blocking input with a timeout."""
