@@ -1,6 +1,7 @@
 import logging
 
-def configure_logging(log_file_name, logger_name):
+def configure_logging(log_file_name, logger_name): #pragma: no cover 
+    #TODO: Implement various logging level and argument to set the level 
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
 

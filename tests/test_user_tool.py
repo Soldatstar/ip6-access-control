@@ -1,15 +1,10 @@
 import pytest
 import os
 import json
-
-###########################################################  
-# This parts adds the project root to sys.path
-import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 from user_tool.user_tool import list_known_apps
-###########################################################
-def test_list_known_apps_with_policies(tmp_path, monkeypatch, capsys): #pragma: no cover
+
+def test_list_known_apps_with_policies(tmp_path, monkeypatch, caplog):  # pragma: no cover
     # Setup: Create a mock POLICIES_DIR with valid policy files
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -30,26 +25,28 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch, capsys): #pragma: 
     monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
-    list_known_apps()
+    with caplog.at_level("INFO"):
+        list_known_apps()
 
     # Verify output
-    captured = capsys.readouterr()
-    assert "Known applications with policies:" in captured.out
-    assert "- App1 (Hash: app1)" in captured.out
-    assert "- App2 (Hash: app2)" in captured.out
+    assert "Known applications with policies:" in caplog.text
+    assert "- App1 (Hash: app1)" in caplog.text
+    assert "- App2 (Hash: app2)" in caplog.text
 
-def test_list_known_apps_no_policies_dir(monkeypatch, capsys): #pragma: no cover
+
+def test_list_known_apps_no_policies_dir(monkeypatch, caplog):  # pragma: no cover
     # Monkeypatch POLICIES_DIR to a non-existent directory
     monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", "/non/existent/directory")
 
     # Call the function
-    list_known_apps()
+    with caplog.at_level("INFO"):
+        list_known_apps()
 
     # Verify output
-    captured = capsys.readouterr()
-    assert "No policies directory found." in captured.out
+    assert "No policies directory found." in caplog.text
 
-def test_list_known_apps_empty_dir(tmp_path, monkeypatch, capsys): #pragma: no cover
+
+def test_list_known_apps_empty_dir(tmp_path, monkeypatch, caplog):  # pragma: no cover
     # Setup: Create an empty mock POLICIES_DIR
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -58,13 +55,14 @@ def test_list_known_apps_empty_dir(tmp_path, monkeypatch, capsys): #pragma: no c
     monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
-    list_known_apps()
+    with caplog.at_level("INFO"):
+        list_known_apps()
 
     # Verify output
-    captured = capsys.readouterr()
-    assert "No known applications with policies." in captured.out
+    assert "No known applications with policies." in caplog.text
 
-def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch, capsys):#pragma: no cover
+
+def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch, caplog):  # pragma: no cover
     # Setup: Create a mock POLICIES_DIR with an invalid policy file
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -76,8 +74,9 @@ def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch, capsys):#pra
     monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
-    list_known_apps()
+    with caplog.at_level("INFO"):
+        list_known_apps()
 
     # Verify output
-    captured = capsys.readouterr()
-    assert "- app1 (Invalid policy file)" in captured.out
+    assert "Known applications with policies:" in caplog.text
+    assert "- app1 (Invalid policy file)" in caplog.text
