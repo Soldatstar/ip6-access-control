@@ -203,16 +203,21 @@ def handle_requests():
             socket.send_multipart([identity, b'', json.dumps(error_response).encode()])
             continue
         logger.info(f"Handling request for {program_name} (hash: {program_hash})")
+        logger.info(f"Syscall: {syscall_name} (ID: {syscall_nr} parameter: {parameter})")
         response = ask_permission(syscall_nr, program_name, program_hash)
 
         match response:
             case "ONE_TIME":  # Allow for one time without saving
+                logger.info(f"User allowed the request for one time for {program_name} (hash: {program_hash})")
                 response = "ALLOW"
             case "ALLOW":
+                logger.info(f"User allowed the request for {program_name} (hash: {program_hash})")
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case "DENY":
+                logger.info(f"User denied the request for {program_name} (hash: {program_hash})")
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case _:
+                logger.error(f"Unknown response: {response}")
                 response = "DENY"
 
         # Send the response back to the requester in the specified format
@@ -244,9 +249,9 @@ def ask_permission(syscall_nr, program_name, program_hash):
     def ask_cli():
         prompt = (
             f"Allow operation for syscall {syscall_nr}?\n"
-            f"Program: {program_name}\n"
-            f"Hash: {program_hash}\n"
-            "( (y)es / (n)o / (o)ne ): "
+            f"            Program: {program_name}\n"
+            f"            Hash: {program_hash}\n"
+            "             ( (y)es / (n)o / (o)ne ): "
         )
         mapping = {
             'yes': 'ALLOW',   'y': 'ALLOW',
@@ -278,7 +283,13 @@ def ask_permission(syscall_nr, program_name, program_hash):
 
     root = tk.Tk()
     root.title("Permission Request")
-    root.geometry("400x150")
+
+    # Calculate dynamic width and height based on content
+    text_width = max(len(program_name), len(program_hash)) * 7  # Approximate character width
+    width = max(400, text_width + 50)  # Ensure minimum width of 400
+    height = 150 + 50  # Base height + extra space for buttons
+
+    root.geometry(f"{width}x{height}")
 
     lbl = tk.Label(
         root,
@@ -301,6 +312,7 @@ def ask_permission(syscall_nr, program_name, program_hash):
     after_id = root.after(100, poll_queue)
 
     root.mainloop()
+    return decision['value']
 
 def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:
     """Simulate non-blocking input with a timeout."""
