@@ -7,8 +7,13 @@ demo/*
 *.json
 
 # Demo files
-/user-tool/process-supervisor/
-/user-tool/process-supervisor/* 
+/user_tool/process-supervisor/
+/user_tool/process-supervisor/* 
 
-user-tool/__pycache__
-user-tool/__pycache__/*
+user_tool/__pycache__
+user_tool/__pycache__/*
+
+user_tool/.coverage
+user_tool/.coverage*
+user_tool/htmlcov
+user_tool/htmlcov/*
