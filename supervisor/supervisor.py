@@ -18,18 +18,22 @@ MANAGER = Manager()
 ALLOW_LIST = MANAGER.list()
 DENY_LIST = MANAGER.list()
 
-def init_seccomp(syscall_to_filter):
+def init_seccomp(deny_list):
+    # TODO: Give both lists to seccomp and adjust the filter
     f = SyscallFilter(defaction=ALLOW)
     
-    for key in list(syscall_to_filter.keys()):
-        for i in range(len(syscall_to_filter[key])):
-            f.add_rule(TRAP, key, Arg(i, EQ, syscall_to_filter[key][i]))
-
+    for deny_decision in deny_list:
+        syscall_nr = deny_decision[0]
+        for i in range(len(deny_decision[1:])):
+            try: 
+                f.add_rule(TRAP, syscall_nr, Arg(i, EQ, deny_decision[1:][i]))
+            except TypeError as e:
+                print(f"TypeError: {e} - For syscall_nr: {syscall_nr}, Argument: {deny_decision[1:][i]}")
+        
     f.load()
 
-def child_prozess(allow_list, deny_list, argv):
-    # TODO: Give both lists to seccomp and adjust the filter
-    init_seccomp(syscall_to_filter={})
+def child_prozess(deny_list, argv):
+    init_seccomp(deny_list=deny_list)
     kill(getpid(),SIGUSR1)
     execv(argv[1],[argv[1]]+argv[2:])
 
@@ -39,14 +43,15 @@ def setup_zmq() -> zmq.Socket:
     socket.connect("tcp://localhost:5556")
     return socket
 
-def ask_for_permission_zmq(syscall, socket) -> str:
+def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_formated, socket) -> str:
     message = {
         "type": "req_decision",
         "body": {
             "program": PROGRAM_ABSOLUTE_PATH,
-            "syscall_id": syscall.syscall,
-            "syscall_name": syscall.name,
-            "parameter": [arg.format() for arg in syscall.arguments]
+            "syscall_id": syscall_nr,
+            "syscall_name": syscall_name,
+            "parameter_raw": arguments_raw,
+            "parameter_formated": arguments_formated
         }
     }
     socket.send_multipart([b'', json.dumps(message).encode()])  
@@ -106,7 +111,7 @@ def main():
     socket = setup_zmq() 
     init_shared_list(socket=socket)
 
-    child = Process(target=child_prozess, args=(ALLOW_LIST,DENY_LIST,argv))
+    child = Process(target=child_prozess, args=(DENY_LIST,argv))
     debugger = PtraceDebugger()
     debugger.traceFork()
     child.start()
@@ -124,12 +129,19 @@ def main():
     
             if syscall.result is None:
                 syscall_number = syscall.syscall
-                syscall_args = [arg.format() for arg in syscall.arguments]
+                syscall_args = [arg.value for arg in syscall.arguments]
+                syscall_args_formated = [arg.format() for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args
                 
                 if not is_already_decided(syscall_nr=syscall_number,arguments=syscall_args):
-                    decision = ask_for_permission_zmq(syscall=syscall, socket=socket)
-                
+                    decision = ask_for_permission_zmq(
+                        syscall_name=syscall.name,
+                        syscall_nr=syscall_number, 
+                        arguments_raw=syscall_args,
+                        arguments_formated=syscall_args_formated, 
+                        socket=socket
+                    )
+
                     if decision == "ALLOW":
                         print(f"Decision: ALLOW Syscall: {syscall.format()}")
                         ALLOW_LIST.append(combined_array)
