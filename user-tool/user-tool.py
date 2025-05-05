@@ -152,7 +152,8 @@ def handle_requests():
             program_path = body.get("program")
             syscall_nr = body.get("syscall_id")
             syscall_name= body.get("syscall_name")
-            parameter = body.get("parameter", "no_parameter")
+            parameter = body.get("parameter_raw", "no_parameter")
+            parameter_formated = body.get("parameter_formated", "no_parameter")
 
             # Calculate the hash of the program path
             program_hash = hashlib.sha256(program_path.encode()).hexdigest()
@@ -204,7 +205,7 @@ def handle_requests():
             continue
         logger.info(f"Handling request for {program_name} (hash: {program_hash})")
         logger.info(f"Syscall: {syscall_name} (ID: {syscall_nr} parameter: {parameter})")
-        response = ask_permission(syscall_nr, program_name, program_hash)
+        response = ask_permission(syscall_nr, program_name, program_hash, parameter_formated)
 
         match response:
             case "ONE_TIME":  # Allow for one time without saving
@@ -229,7 +230,7 @@ def handle_requests():
 
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
 
-def ask_permission(syscall_nr, program_name, program_hash):
+def ask_permission(syscall_nr, program_name, program_hash, parameter_formated):
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
@@ -251,6 +252,7 @@ def ask_permission(syscall_nr, program_name, program_hash):
             f"Allow operation for syscall {syscall_nr}?\n"
             f"            Program: {program_name}\n"
             f"            Hash: {program_hash}\n"
+            f"            Parameter: {parameter_formated}\n"
             "             ( (y)es / (n)o / (o)ne ): "
         )
         mapping = {
@@ -296,7 +298,8 @@ def ask_permission(syscall_nr, program_name, program_hash):
         text=(
             f"Allow operation for syscall {syscall_nr}?\n"
             f"Program: {program_name}\n"
-            f"Hash: {program_hash}"
+            f"Hash: {program_hash}\n"
+            f"Parameter: {parameter_formated}"
         ),
         wraplength=350
     )
