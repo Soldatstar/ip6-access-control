@@ -8,10 +8,14 @@ import threading
 import queue
 import sys
 import select
-from logging_config import configure_logging
-import hashlib  
-
-BASE_DIR = os.path.join(os.path.dirname(__file__), "process-supervisor")
+import hashlib
+###########################################################  
+# This parts adds the project root to sys.path
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from shared.logging_config import configure_logging
+###########################################################
+BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "process-supervisor")  # One level up
 POLICIES_DIR = os.path.join(BASE_DIR, "policies")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
