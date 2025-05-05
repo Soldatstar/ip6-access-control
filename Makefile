@@ -26,8 +26,12 @@ create:
 delete:
 	rm -rf $(VENV_DIR)
 	rm $(DEMOPROGRAM)
-	rm -r user-tool/__pycache__/
-	rm -r user-tool/process-supervisor/
+	rm -r process-supervisor/
+	rm -r user_tool/__pycache__/
+	rm -r shared/__pycache__/
+	rm -r tests/__pycache__/
+	rm -r .pytest_cache
+	rm .coverage
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
