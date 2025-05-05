@@ -8,6 +8,7 @@ import threading
 import queue
 import sys
 import select
+import tkinter as tk
 from logging_config import configure_logging
 import hashlib  
 
@@ -78,14 +79,14 @@ def save_decision(program_name: str, program_path: str, program_hash: str, sysca
 def list_known_apps():
     """List all applications with known policies."""
     if not os.path.exists(POLICIES_DIR):
-        print("No policies directory found.")
+        logger.info("No policies directory found.")
         return
 
     apps = os.listdir(POLICIES_DIR)
     if not apps:
-        print("No known applications with policies.")
+        logger.info("No known applications with policies.")
     else:
-        print("Known applications with policies:")
+        logger.info("Known applications with policies:")
         for app in apps:
             policy_file = os.path.join(POLICIES_DIR, app, "policy.json")
             if os.path.exists(policy_file):
@@ -93,16 +94,16 @@ def list_known_apps():
                     with open(policy_file, "r") as file:
                         data = json.load(file)
                         process_name = data.get("metadata", {}).get("process_name", "Unknown")
-                        print(f"- {process_name} (Hash: {app})")
+                        logger.info(f"- {process_name} (Hash: {app})")
                 except json.JSONDecodeError:
-                    print(f"- {app} (Invalid policy file)")
+                    logger.warning(f"- {app} (Invalid policy file)")
             else:
-                print(f"- {app} (No policy file found)")
+                logger.warning(f"- {app} (No policy file found)")
 
 def delete_all_policies():
     """Delete all policies."""
     if not os.path.exists(POLICIES_DIR):
-        print("No policies directory found.")
+        logger.info("No policies directory found.")
         return
 
     for app in os.listdir(POLICIES_DIR):
@@ -110,11 +111,11 @@ def delete_all_policies():
         if os.path.isdir(app_path):
             try:
                 shutil.rmtree(app_path) 
-                print(f"Deleted policies for {app}.")
+                logger.info(f"Deleted policies for {app}.")
             except Exception as e:
-                print(f"Failed to delete policies for {app}. Error: {e}")
+                logger.error(f"Failed to delete policies for {app}. Error: {e}")
 
-    print("All policies deleted.")
+    logger.info("All policies deleted.")
 
 def zmq_listener():
     """Background thread to listen for incoming ZeroMQ requests."""
@@ -166,18 +167,26 @@ def handle_requests():
             program_hash = hashlib.sha256(program_path.encode()).hexdigest()
             #read policy file if it exists
             policy_file = os.path.join(POLICIES_DIR, program_hash, "policy.json")
-            response = None;
-            if os.path.exists(policy_file):
+
+            response = None
+            if os.path.exists(policy_file) and os.path.getsize(policy_file) > 0:
                 with open(policy_file, "r") as file:
-                    data = json.load(file)
-                    print(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
-                    rules = data.get("rules", {}) 
-                    response = {
-                        "status": "success",
-                        "data": rules
-                    }
+                    try:
+                        data = json.load(file)
+                        logger.debug(f"Policy for {program_hash}: {json.dumps(data, indent=4)}")
+                        rules = data.get("rules", {})
+                        response = {
+                            "status": "success",
+                            "data": rules
+                        }
+                    except json.JSONDecodeError:
+                        logger.error(f"Policy file for {program_hash} is invalid.")
+                        response = {
+                            "status": "error",
+                            "data": {"message": "Invalid policy file"}
+                        }
             else:
-                print(f"No policy found for {program_hash}")
+                logger.info(f"No policy found for {program_hash}")
                 response = {
                     "status": "error",
                     "data": {"message": "No policy found"}
@@ -193,18 +202,22 @@ def handle_requests():
             }
             socket.send_multipart([identity, b'', json.dumps(error_response).encode()])
             continue
+        logger.info(f"Handling request for {program_name} (hash: {program_hash})")
+        logger.info(f"Syscall: {syscall_name} (ID: {syscall_nr} parameter: {parameter})")
+        response = ask_permission(syscall_nr, program_name, program_hash)
 
-        response = None
-        match input(f"[User-Tool] Allow operation for syscall {syscall_name} (program: {program_name}, parameter: {parameter})? (y/n/1): ").strip().lower():
-            case "1":  # Allow for one time without saving
+        match response:
+            case "ONE_TIME":  # Allow for one time without saving
+                logger.info(f"User allowed the request for one time for {program_name} (hash: {program_hash})")
                 response = "ALLOW"
-            case "y":
-                response = "ALLOW"
+            case "ALLOW":
+                logger.info(f"User allowed the request for {program_name} (hash: {program_hash})")
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
-            case "n":
-                response = "DENY"
+            case "DENY":
+                logger.info(f"User denied the request for {program_name} (hash: {program_hash})")
                 save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case _:
+                logger.error(f"Unknown response: {response}")
                 response = "DENY"
 
         # Send the response back to the requester in the specified format
@@ -215,6 +228,91 @@ def handle_requests():
         socket.send_multipart([identity, b'', json.dumps(success_response).encode()])
 
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
+
+def ask_permission(syscall_nr, program_name, program_hash):
+    decision = {'value': None}
+    q = queue.Queue()
+    after_id = None
+
+    def set_decision(choice):
+        nonlocal after_id
+        if decision['value'] is None:
+            decision['value'] = choice
+            # cancel any pending poll_queue callback
+            if after_id is not None:
+                try:
+                    root.after_cancel(after_id)
+                except tk.TclError:
+                    pass
+            root.destroy()
+
+    def ask_cli():
+        prompt = (
+            f"Allow operation for syscall {syscall_nr}?\n"
+            f"            Program: {program_name}\n"
+            f"            Hash: {program_hash}\n"
+            "             ( (y)es / (n)o / (o)ne ): "
+        )
+        mapping = {
+            'yes': 'ALLOW',   'y': 'ALLOW',
+            'no':  'DENY',    'n': 'DENY',
+            'one': 'ONE_TIME','o': 'ONE_TIME',
+        }
+
+        logger.info(prompt)
+
+        # poll stdin until GUI decision or valid CLI answer
+        while decision['value'] is None:
+            r, _, _ = select.select([sys.stdin], [], [], 4.0)
+            if r:
+                ans = sys.stdin.readline().strip().lower()
+                choice = mapping.get(ans)
+                if choice:
+                    q.put(choice)
+                    break
+
+    def poll_queue():
+        nonlocal after_id
+        try:
+            choice = q.get_nowait()
+        except queue.Empty:
+            # schedule next poll
+            after_id = root.after(100, poll_queue)
+        else:
+            set_decision(choice)
+
+    root = tk.Tk()
+    root.title("Permission Request")
+
+    # Calculate dynamic width and height based on content
+    text_width = max(len(program_name), len(program_hash)) * 7  # Approximate character width
+    width = max(400, text_width + 50)  # Ensure minimum width of 400
+    height = 150 + 50  # Base height + extra space for buttons
+
+    root.geometry(f"{width}x{height}")
+
+    lbl = tk.Label(
+        root,
+        text=(
+            f"Allow operation for syscall {syscall_nr}?\n"
+            f"Program: {program_name}\n"
+            f"Hash: {program_hash}"
+        ),
+        wraplength=350
+    )
+    lbl.pack(pady=20)
+
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(pady=10)
+    for txt, val in [("Allow","ALLOW"), ("Deny","DENY"), ("One Time","ONE_TIME")]:
+        tk.Button(btn_frame, text=txt, width=10,
+                  command=lambda v=val: set_decision(v)).pack(side=tk.LEFT, padx=5)
+
+    threading.Thread(target=ask_cli, daemon=True).start()
+    after_id = root.after(100, poll_queue)
+
+    root.mainloop()
+    return decision['value']
 
 def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:
     """Simulate non-blocking input with a timeout."""
@@ -231,36 +329,38 @@ def main():
 
     while True:
         #os.system('clear')  # Clear the console
-        print("\nUser Tool Menu:")
-        print("1. List Known Apps")
-        print("2. Delete All Policies")
-        print("3. Exit")
+        logger.info("User Tool Menu:")
+        logger.info("1. List Known Apps")
+        logger.info("2. Delete All Policies")
+        logger.info("3. Exit")
 
-        print("\nWaiting for user input...")
+        logger.info("Waiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
             choice = non_blocking_input("")
             if choice:
                 break
 
         if NEW_REQUEST_EVENT.is_set():
-            print("\n[Notification] New request received! Handling it now...")
+            logger.info("\n[Notification] New request received! Handling it now...")
             handle_requests()
             continue
 
         elif choice == "1":
             os.system('clear')
+            logger.info("Listing known apps...")
             list_known_apps()
             input("Press Enter to return to the menu...")
         elif choice == "2":
             os.system('clear')
+            logger.info("Deleting all policies...")
             delete_all_policies()
             input("Press Enter to return to the menu...")
         elif choice == "3":
             os.system('clear')
-            print("Exiting User Tool.")
+            logger.info("Exiting User Tool.")
             break
         else:
-            print("Invalid choice. Please try again.")
+            logger.warning("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()
