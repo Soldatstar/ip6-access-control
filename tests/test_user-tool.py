@@ -1,8 +1,14 @@
 import pytest
 import os
 import json
-from user_tool import delete_all_policies, list_known_apps, save_decision
 
+###########################################################  
+# This parts adds the project root to sys.path
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from user_tool.user_tool import list_known_apps
+###########################################################
 def test_list_known_apps_with_policies(tmp_path, monkeypatch, capsys): #pragma: no cover
     # Setup: Create a mock POLICIES_DIR with valid policy files
     mock_policies_dir = tmp_path / "policies"
@@ -21,7 +27,7 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch, capsys): #pragma: 
     }))
 
     # Monkeypatch POLICIES_DIR to point to the temporary directory
-    monkeypatch.setattr("user_tool.POLICIES_DIR", str(mock_policies_dir))
+    monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
     list_known_apps()
@@ -34,7 +40,7 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch, capsys): #pragma: 
 
 def test_list_known_apps_no_policies_dir(monkeypatch, capsys): #pragma: no cover
     # Monkeypatch POLICIES_DIR to a non-existent directory
-    monkeypatch.setattr("user_tool.POLICIES_DIR", "/non/existent/directory")
+    monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", "/non/existent/directory")
 
     # Call the function
     list_known_apps()
@@ -49,7 +55,7 @@ def test_list_known_apps_empty_dir(tmp_path, monkeypatch, capsys): #pragma: no c
     mock_policies_dir.mkdir()
 
     # Monkeypatch POLICIES_DIR to point to the temporary directory
-    monkeypatch.setattr("user_tool.POLICIES_DIR", str(mock_policies_dir))
+    monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
     list_known_apps()
@@ -67,7 +73,7 @@ def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch, capsys):#pra
     (app1_dir / "policy.json").write_text("Invalid JSON")
 
     # Monkeypatch POLICIES_DIR to point to the temporary directory
-    monkeypatch.setattr("user_tool.POLICIES_DIR", str(mock_policies_dir))
+    monkeypatch.setattr("user_tool.user_tool.POLICIES_DIR", str(mock_policies_dir))
 
     # Call the function
     list_known_apps()
