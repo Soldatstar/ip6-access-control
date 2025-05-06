@@ -19,14 +19,15 @@ ALLOW_LIST = MANAGER.list()
 DENY_LIST = MANAGER.list()
 
 def init_seccomp(deny_list):
-    # TODO: Give both lists to seccomp and adjust the filter
     f = SyscallFilter(defaction=ALLOW)
     
     for deny_decision in deny_list:
         syscall_nr = deny_decision[0]
         for i in range(len(deny_decision[1:])):
             try: 
-                f.add_rule(TRAP, syscall_nr, Arg(i, EQ, deny_decision[1:][i]))
+                # TODO: Look at seccomp how path to files are handled
+                if not isinstance(deny_decision[1:][i], str):
+                    f.add_rule(TRAP, syscall_nr, Arg(i, EQ, deny_decision[1:][i]))
             except TypeError as e:
                 print(f"TypeError: {e} - For syscall_nr: {syscall_nr}, Argument: {deny_decision[1:][i]}")
         
@@ -102,6 +103,20 @@ def is_already_decided(syscall_nr, arguments):
                 return True
     return False
 
+def prepare_arguments(syscall_args):
+    arguments = []
+    for arg in syscall_args:
+        match arg.name:
+            case "filename":  
+                arguments.append(arg.format())
+            case "flags":
+                arguments.append(arg.value)
+            case "mode":
+                arguments.append(arg.value)
+            case _:
+                arguments.append("*")
+    return arguments
+
 def main():
     if len(argv) < 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
@@ -129,7 +144,7 @@ def main():
     
             if syscall.result is None:
                 syscall_number = syscall.syscall
-                syscall_args = [arg.value for arg in syscall.arguments]
+                syscall_args = prepare_arguments(syscall_args=syscall.arguments)
                 syscall_args_formated = [arg.format() for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args
                 
