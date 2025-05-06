@@ -71,10 +71,34 @@ def parse_file():
             elif parameter_name:
                 parameter_values.append(line)
 
+def get_question(syscall_nr, argument):
+    for groups in GROUPS_ORDER:
+        for syscall in GROUPS_SYSCALL[groups]:
+            if syscall == syscall_nr:
+                for parameter in GROUPS_PARAMETER_ORDER[groups]:
+                    
+                    counter = 0
+                    for arg in PARAMETERS[parameter]:
+                        key, value = arg.split("=")
+                        value = value.strip()
+                        
+                        for a in ARGUMENTS[value]:
+                            if a in argument:
+                              counter += 1
+                              break
+                          
+                    if len(argument) != 0 and counter == len(argument):
+                        return parameter
+                    elif len(argument) == 0 and len(PARAMETERS[parameter]) == 0:
+                        return parameter 
+    return "-1"
+
 if __name__ == "__main__":
     if os.path.exists(FILE_NAME):
         parse_file()
-        
+        print(get_question(syscall_nr=257,argument=["/root"]))
+        print(get_question(syscall_nr=257,argument=[]))
+        print("---")
         print(GROUPS_ORDER)
         print(GROUPS_PARAMETER_ORDER)
         print(GROUPS_SYSCALL)
