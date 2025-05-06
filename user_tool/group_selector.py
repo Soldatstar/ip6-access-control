@@ -1,14 +1,13 @@
 import os
 import re
 
-FILE_NAME = "groups"
 GROUPS_ORDER = []  # List to store the order of groups
 GROUPS_PARAMETER_ORDER = {}  # Dictionary to store the order of parameters for each group
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
 
-def parse_file():
+def parse_file(filename):
     argument_name = None  
     argument_values = []  
     group_name = None  
@@ -16,7 +15,7 @@ def parse_file():
     parameter_name = None  
     parameter_values = []  
 
-    with open(FILE_NAME, 'r') as file:
+    with open(filename, 'r') as file:
         for line in file:
             # Remove leading/trailing whitespace
             line = line.strip()  
@@ -71,15 +70,31 @@ def parse_file():
             elif parameter_name:
                 parameter_values.append(line)
 
-if __name__ == "__main__":
-    if os.path.exists(FILE_NAME):
-        parse_file()
-        
-        print(GROUPS_ORDER)
-        print(GROUPS_PARAMETER_ORDER)
-        print(GROUPS_SYSCALL)
-        print(PARAMETERS)
-        print(ARGUMENTS)
-
-    else:
-        print(f"File {FILE_NAME} not found")
+def get_question(syscall_nr, argument):
+    for groups in GROUPS_ORDER:
+        for syscall in GROUPS_SYSCALL[groups]:
+            # If the current system call matches the given syscall_nr
+            if syscall == syscall_nr:
+                for parameter in GROUPS_PARAMETER_ORDER[groups]:
+                    
+                    # Iterate through the arguments for the current parameter
+                    counter = 0
+                    for arg in PARAMETERS[parameter]:
+                        key, value = arg.split("=")
+                        value = value.strip()
+                        
+                        # Check if any of the arguments in ARGUMENTS[value] are present in the given argument array
+                        for a in ARGUMENTS[value]:
+                            if a in argument:
+                              counter += 1
+                              break
+                          
+                    # If the length of the given argument is not 0 and all arguments match
+                    if len(argument) != 0 and counter == len(argument):
+                        return parameter
+                    # If the length of the given argument is 0 and the parameter has no arguments
+                    elif len(argument) == 0 and len(PARAMETERS[parameter]) == 0:
+                        return parameter 
+    
+    # If no matching parameter is found, return "-1"
+    return "-1"
