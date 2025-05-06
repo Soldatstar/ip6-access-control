@@ -21,7 +21,7 @@ import zmq
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from user_tool import policy_manager
-from user_tool import utils
+from user_tool import user_interaction
 from shared import logging_config
 from user_tool.policy_manager import Policy
 
@@ -155,7 +155,7 @@ def handle_requests():
                     program_name, program_hash)
         LOGGER.info("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
-        response = utils.ask_permission(
+        response = user_interaction.ask_permission(
             syscall_nr, program_name, program_hash, parameter_formated, LOGGER)
 
         match response:
@@ -193,19 +193,21 @@ def handle_requests():
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
 
 
-def main():
+def main(test_mode=False):
     """
     Main entry point for the User Tool.
 
     This function starts the ZeroMQ listener in a background thread and provides
     a menu-driven interface for the user to interact with syscall policies.
+
+    Args:
+        test_mode (bool): If True, the function will exit after one iteration of the loop.
     """
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
 
     while True:
-        # os.system('clear')  # Clear the console
         LOGGER.info("User Tool Menu:")
         LOGGER.info("1. List Known Apps")
         LOGGER.info("2. Delete All Policies")
@@ -213,13 +215,12 @@ def main():
 
         LOGGER.info("Waiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
-            choice = utils.non_blocking_input("")
+            choice = user_interaction.non_blocking_input("")
             if choice:
                 break
 
         if NEW_REQUEST_EVENT.is_set():
-            LOGGER.info(
-                "\n[Notification] New request received! Handling it now...")
+            LOGGER.info("\n[Notification] New request received! Handling it now...")
             handle_requests()
             continue
 
@@ -239,6 +240,9 @@ def main():
             break
         else:
             LOGGER.warning("Invalid choice. Please try again.")
+
+        if test_mode:
+            break  # Exit the loop after one iteration in test mode
 
 
 if __name__ == "__main__":
