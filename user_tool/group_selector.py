@@ -74,30 +74,37 @@ def parse_file():
 def get_question(syscall_nr, argument):
     for groups in GROUPS_ORDER:
         for syscall in GROUPS_SYSCALL[groups]:
+            # If the current system call matches the given syscall_nr
             if syscall == syscall_nr:
                 for parameter in GROUPS_PARAMETER_ORDER[groups]:
                     
+                    # Iterate through the arguments for the current parameter
                     counter = 0
                     for arg in PARAMETERS[parameter]:
                         key, value = arg.split("=")
                         value = value.strip()
                         
+                        # Check if any of the arguments in ARGUMENTS[value] are present in the given argument array
                         for a in ARGUMENTS[value]:
                             if a in argument:
                               counter += 1
                               break
                           
+                    # If the length of the given argument is not 0 and all arguments match
                     if len(argument) != 0 and counter == len(argument):
                         return parameter
+                    # If the length of the given argument is 0 and the parameter has no arguments
                     elif len(argument) == 0 and len(PARAMETERS[parameter]) == 0:
                         return parameter 
+    
+    # If no matching parameter is found, return "-1"
     return "-1"
 
 if __name__ == "__main__":
     if os.path.exists(FILE_NAME):
         parse_file()
-        print(get_question(syscall_nr=257,argument=["/root"]))
-        print(get_question(syscall_nr=257,argument=[]))
+        print(get_question(syscall_nr=79,argument=["X_OK"]))
+        print(get_question(syscall_nr=3,argument=["/etc/passwd"]))
         print("---")
         print(GROUPS_ORDER)
         print(GROUPS_PARAMETER_ORDER)
