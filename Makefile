@@ -33,8 +33,10 @@ delete:
 	rm -rf user_tool/__pycache__/
 	rm -rf shared/__pycache__/
 	rm -rf tests/__pycache__/
+	rm -rf tests/.pytest_cache
 	rm -rf .pytest_cache
 	rm -rf __pycache__/
+	rm -rf htmlcov/
 	-rm -f .coverage
 	
 # Ziel zum Ausführen des Skripts (Linux)
@@ -47,4 +49,5 @@ ut:
 test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report 
+	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage html
 .PHONY: help create delete run
