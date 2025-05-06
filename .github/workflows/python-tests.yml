@@ -19,10 +19,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Run Pylint
+        run: |
+          pylint $(git ls-files '*.py') || true
       - name: Test with pytest
         run: |
           coverage run --source=supervisor,user_tool,tests --omit=tests/* -m pytest -vv
       - name: Generate Coverage Report
         run: |
           coverage report -m
-      
