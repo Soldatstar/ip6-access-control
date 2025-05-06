@@ -1,20 +1,23 @@
-import pytest
-import os
+"""
+Test cases for the policy_manager module.
+
+This module contains unit tests for the following functionalities:
+- Listing applications with known syscall policies.
+- Handling cases where the policies directory is missing or empty.
+- Handling invalid policy files.
+"""
+
 import json
-import sys
 from unittest.mock import MagicMock
-from pathlib import Path
-
-# Add the project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-# Delegate variables to policy_manager
-from shared.logging_config import configure_logging
-logger = configure_logging("test_user_tool.log", "Test-User-Tool")
-from user_tool import policy_manager 
+from user_tool import policy_manager
 
 
 def test_list_known_apps_with_policies(tmp_path, monkeypatch):
+    """
+    Test listing known applications with valid policies.
+    This test checks if the function correctly identifies applications with valid
+    policies and logs their names and hashes.
+    """
     # Given: A mock POLICIES_DIR with valid policy files
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -34,7 +37,7 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch):
     # And: Monkeypatch POLICIES_DIR and logger
     monkeypatch.setattr("user_tool.policy_manager.POLICIES_DIR", str(mock_policies_dir))
     mock_logger = MagicMock()
-    monkeypatch.setattr("user_tool.policy_manager.logger", mock_logger)
+    monkeypatch.setattr("user_tool.policy_manager.LOGGER", mock_logger)
 
     # When: The function is called
     policy_manager.list_known_apps()
@@ -50,10 +53,15 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch):
 
 
 def test_list_known_apps_no_policies_dir(monkeypatch):
+    """
+    Test behavior when the policies directory does not exist.
+    This test ensures that the function logs a message indicating the absence
+    of the policies directory.
+    """
     # Given: POLICIES_DIR is set to a non-existent directory
     monkeypatch.setattr("user_tool.policy_manager.POLICIES_DIR", "/non/existent/directory")
     mock_logger = MagicMock()
-    monkeypatch.setattr("user_tool.policy_manager.logger", mock_logger)
+    monkeypatch.setattr("user_tool.policy_manager.LOGGER", mock_logger)
 
     # When: The function is called
     policy_manager.list_known_apps()
@@ -67,6 +75,11 @@ def test_list_known_apps_no_policies_dir(monkeypatch):
 
 
 def test_list_known_apps_empty_dir(tmp_path, monkeypatch):
+    """
+    Test behavior when the policies directory is empty.
+    This test ensures that the function logs a message indicating no known
+    applications with policies are found.
+    """
     # Given: An empty mock POLICIES_DIR
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -74,7 +87,7 @@ def test_list_known_apps_empty_dir(tmp_path, monkeypatch):
     # And: Monkeypatch POLICIES_DIR and logger
     monkeypatch.setattr("user_tool.policy_manager.POLICIES_DIR", str(mock_policies_dir))
     mock_logger = MagicMock()
-    monkeypatch.setattr("user_tool.policy_manager.logger", mock_logger)
+    monkeypatch.setattr("user_tool.policy_manager.LOGGER", mock_logger)
 
     # When: The function is called
     policy_manager.list_known_apps()
@@ -88,6 +101,11 @@ def test_list_known_apps_empty_dir(tmp_path, monkeypatch):
 
 
 def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch):
+    """
+    Test behavior when a policy file is invalid.
+    This test ensures that the function logs a warning for invalid policy files
+    while listing known applications.
+    """
     # Given: A mock POLICIES_DIR with an invalid policy file
     mock_policies_dir = tmp_path / "policies"
     mock_policies_dir.mkdir()
@@ -98,7 +116,7 @@ def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch):
     # And: Monkeypatch POLICIES_DIR and logger
     monkeypatch.setattr("user_tool.policy_manager.POLICIES_DIR", str(mock_policies_dir))
     mock_logger = MagicMock()
-    monkeypatch.setattr("user_tool.policy_manager.logger", mock_logger)
+    monkeypatch.setattr("user_tool.policy_manager.LOGGER", mock_logger)
 
     # When: The function is called
     policy_manager.list_known_apps()

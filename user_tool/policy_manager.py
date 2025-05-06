@@ -1,24 +1,55 @@
+"""
+Module to manage syscall policies for applications.
+
+This module provides functionality to:
+- Save user decisions regarding syscall policies.
+- List applications with existing policies.
+- Delete all existing policies.
+"""
+
 import os
 import json
 import datetime
 import shutil
 
 POLICIES_DIR = None
-logger = None
+LOGGER = None
 
-def save_decision(program_name: str, program_path: str, program_hash: str, syscall_nr: int, decision: str, user: str = "user123", parameter: str = "parameter"):
-    process_dir = os.path.join(POLICIES_DIR, program_hash)  
+def save_decision(
+    program_path: str,
+    program_hash: str,
+    syscall_nr: int,
+    decision: str,
+    user: str = "user123",
+    parameter: str = "parameter",
+):
+    """
+    Save the decision made by the user regarding a syscall policy.
+
+    Args:
+        program_path (str): The file path of the program.
+        program_hash (str): The hash of the program for unique identification.
+        syscall_nr (int): The syscall number.
+        decision (str): The decision made by the user ("ALLOW" or "DENY").
+        user (str): The user making the decision. Defaults to "user123".
+        parameter (str): Additional parameter information. Defaults to "parameter".
+
+    This function updates or creates a policy file for the given program
+    and saves the user's decision regarding the syscall.
+    """
+    program_name = os.path.basename(program_path)
+    process_dir = os.path.join(POLICIES_DIR, program_hash)
     os.makedirs(process_dir, exist_ok=True)
-    logger.info(f"Saving decision for {program_name} (hash: {program_hash}) in {process_dir}")
+    LOGGER.info(f"Saving decision for {program_name} (hash: {program_hash}) in {process_dir}")
     policy_file = os.path.join(process_dir, "policy.json")
 
     # Handle empty or invalid policy files
     if os.path.exists(policy_file):
         try:
-            with open(policy_file, "r") as file:
+            with open(policy_file, "r", encoding="utf-8") as file:
                 data = json.load(file)
         except (json.JSONDecodeError, FileNotFoundError):
-            logger.warning(f"Policy file {policy_file} is empty or invalid. Reinitializing.")
+            LOGGER.warning(f"Policy file {policy_file} is empty or invalid. Reinitializing.")
             data = None
     else:
         data = None
@@ -50,46 +81,57 @@ def save_decision(program_name: str, program_path: str, program_hash: str, sysca
     data["metadata"]["last_modified"] = datetime.datetime.now().isoformat()
 
     # Save the updated policy
-    with open(policy_file, "w") as file:
+    with open(policy_file, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
 def list_known_apps():
-    """List all applications with known policies."""
+    """
+    List all applications with known syscall policies.
+
+    This function scans the policies directory and logs the names of applications
+    with existing policies. It also handles cases where the policy file is missing
+    or invalid.
+    """
     if not os.path.exists(POLICIES_DIR):
-        logger.info("No policies directory found.")
+        LOGGER.info("No policies directory found.")
         return
 
     apps = sorted(os.listdir(POLICIES_DIR))  # Sort the apps list for consistent order
     if not apps:
-        logger.info("No known applications with policies.")
+        LOGGER.info("No known applications with policies.")
     else:
-        logger.info("Known applications with policies:")
+        LOGGER.info("Known applications with policies:")
         for app in apps:
             policy_file = os.path.join(POLICIES_DIR, app, "policy.json")
             if os.path.exists(policy_file):
                 try:
-                    with open(policy_file, "r") as file:
+                    with open(policy_file, "r",encoding="UTF-8") as file:
                         data = json.load(file)
                         process_name = data.get("metadata", {}).get("process_name", "Unknown")
-                        logger.info(f"- {process_name} (Hash: {app})")
+                        LOGGER.info(f"- {process_name} (Hash: {app})")
                 except json.JSONDecodeError:
-                    logger.warning(f"- {app} (Invalid policy file)")
+                    LOGGER.warning(f"- {app} (Invalid policy file)")
             else:
-                logger.warning(f"- {app} (No policy file found)")
+                LOGGER.warning(f"- {app} (No policy file found)")
 
 def delete_all_policies():
-    """Delete all policies."""
+    """
+    Delete all existing syscall policies.
+
+    This function removes all policy directories and their contents from the
+    policies directory. It logs the status of each deletion attempt.
+    """
     if not os.path.exists(POLICIES_DIR):
-        logger.info("No policies directory found.")
+        LOGGER.info("No policies directory found.")
         return
 
     for app in os.listdir(POLICIES_DIR):
         app_path = os.path.join(POLICIES_DIR, app)
         if os.path.isdir(app_path):
             try:
-                shutil.rmtree(app_path) 
-                logger.info(f"Deleted policies for {app}.")
-            except Exception as e:
-                logger.error(f"Failed to delete policies for {app}. Error: {e}")
+                shutil.rmtree(app_path)
+                LOGGER.info(f"Deleted policies for {app}.")
+            except OSError as e:
+                LOGGER.error(f"Failed to delete policies for {app}. Error: {e}")
 
-    logger.info("All policies deleted.")
+    LOGGER.info("All policies deleted.")
