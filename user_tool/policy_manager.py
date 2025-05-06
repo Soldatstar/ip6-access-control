@@ -134,7 +134,7 @@ def delete_all_policies():
         LOGGER.info("No policies directory found.")
         return
 
-    for app in os.listdir(POLICIES_DIR):
+    for app in sorted(os.listdir(POLICIES_DIR)):  # Sort directory entries
         app_path = os.path.join(POLICIES_DIR, app)
         if os.path.isdir(app_path):
             try:

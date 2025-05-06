@@ -1,4 +1,3 @@
-
 import tkinter as tk
 import threading
 import queue
@@ -6,6 +5,24 @@ import select
 import sys
 
 def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, logger):
+    """
+    Prompt the user for permission to allow or deny a syscall operation.
+
+    This function provides both a graphical user interface (GUI) and a command-line
+    interface (CLI) for the user to make a decision regarding a syscall operation.
+    The decision can be "ALLOW", "DENY", or "ONE_TIME". The GUI and CLI run
+    concurrently, and the first decision made by the user is returned.
+
+    Args:
+        syscall_nr (int): The syscall number being requested.
+        program_name (str): The name of the program requesting the syscall.
+        program_hash (str): A unique hash representing the program.
+        parameter_formated (str): A formatted string of the syscall parameters.
+        logger (logging.Logger): A logger instance for logging messages.
+
+    Returns:
+        str: The user's decision, which can be "ALLOW", "DENY", or "ONE_TIME".
+    """
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
@@ -26,7 +43,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
             f"Allow operation for syscall {syscall_nr}?\n"
             f"            Program: {program_name}\n"
             f"            Hash: {program_hash}\n"
-            #f"            Parameter: {parameter_formated}\n" 
+            #f"            Parameter: {parameter_formated}\n"
             "             ( (y)es / (n)o / (o)ne ): "
         )
         mapping = {
@@ -89,6 +106,20 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
     return decision['value']
 
 def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:
+    """
+    Prompt the user for input without blocking indefinitely.
+
+    This function displays a prompt to the user and waits for input for a specified
+    timeout period. If the user provides input within the timeout, it is returned.
+    Otherwise, the function returns None.
+
+    Args:
+        prompt (str): The message to display to the user.
+        timeout (float): The maximum time (in seconds) to wait for input. Defaults to 0.5 seconds.
+
+    Returns:
+        str: The user's input if provided within the timeout, or None if no input is received.
+    """
     print(prompt, end='', flush=True)
     ready, _, _ = select.select([sys.stdin], [], [], timeout)
     if ready:
