@@ -1,0 +1,29 @@
+a: critical-directories {
+    /root
+    /boot 
+}
+
+a: normal-directories {
+    /home
+    /tmp
+}
+
+g: AccessFile {
+    2 open(const char *pathname, int flags, mode_t mode)
+    85 creat(const char *pathname, mode_t mode)
+    257 openat(int dirfd, const char *pathname, int flags, mode_t mode)
+    437 openat2(int dirfd, const char *pathname, const struct open_how *how, size_t size)
+
+    p: Do you want to allow access to critical directories? {
+        pathname = critical-directories
+        flags = *
+        mode
+        dirfd
+        how
+        size
+    }
+
+    p: Do you want to allow access to directories? {
+       
+    }
+}
