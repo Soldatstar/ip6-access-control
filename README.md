@@ -1,5 +1,7 @@
 # Linux Access Control Tool
 
+[![codecov](https://codecov.io/gh/Soldatstar/ip6-access-control/branch/main/graph/badge.svg)](https://codecov.io/gh/Soldatstar/ip6-access-control)
+
 ## Problematik:
 
 Linux bietet Möglichkeiten zur Kontrolle des Zugriffs auf Systemressourcen wie Dateien oder Netzwerkverbindungen (z.B. AppArmor, SELinux). Allerdings haben diese vorhandenen Mechanismen folgende Nachteile:
