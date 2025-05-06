@@ -200,3 +200,81 @@ def test_zmq_listener(monkeypatch):
 
     # And: The listener should log the ZeroMQ error with the correct exception object
     mock_logger.error.assert_any_call("ZeroMQ error: %s", mock.ANY)
+
+
+def test_main_list_known_apps(monkeypatch):
+    """
+    Test the 'List Known Apps' option in the main menu.
+    This test ensures that the function calls the appropriate policy manager method.
+    """
+    # Given: Mock user input and policy manager
+    mock_logger = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
+    mock_policy_manager = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
+    monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "1")
+    monkeypatch.setattr("os.system", lambda _: None)  # Mock os.system to prevent clearing the console
+
+    # Mock threading.Thread to prevent actual thread creation
+    mock_thread = MagicMock()
+    monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
+
+    # When: The main function is called and the user selects option 1
+    with patch("builtins.input", lambda _: None):  # Mock input to prevent blocking
+        user_tool_main.main(test_mode=True)
+
+    # Then: The policy manager's list_known_apps method should be called
+    mock_policy_manager.list_known_apps.assert_called_once()
+    mock_logger.info.assert_any_call("Listing known apps...")
+    mock_thread.start.assert_called_once()  # Ensure the thread's start method was called
+
+
+def test_main_delete_all_policies(monkeypatch):
+    """
+    Test the 'Delete All Policies' option in the main menu.
+    This test ensures that the function calls the appropriate policy manager method.
+    """
+    # Given: Mock user input and policy manager
+    mock_logger = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
+    mock_policy_manager = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
+    monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "2")
+    monkeypatch.setattr("os.system", lambda _: None)  # Mock os.system to prevent clearing the console
+
+    # Mock threading.Thread to prevent actual thread creation
+    mock_thread = MagicMock()
+    monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
+
+    # When: The main function is called and the user selects option 2
+    with patch("builtins.input", lambda _: None):  # Mock input to prevent blocking
+        user_tool_main.main(test_mode=True)
+
+    # Then: The policy manager's delete_all_policies method should be called
+    mock_policy_manager.delete_all_policies.assert_called_once()
+    mock_logger.info.assert_any_call("Deleting all policies...")
+    mock_thread.start.assert_called_once()  # Ensure the thread's start method was called
+
+
+def test_main_exit(monkeypatch):
+    """
+    Test the 'Exit' option in the main menu.
+    This test ensures that the function exits the loop when the user selects '3'.
+    """
+    # Given: Mock user input
+    mock_logger = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
+    monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "3")
+    monkeypatch.setattr("os.system", lambda _: None)  # Mock os.system to prevent clearing the console
+
+    # Mock threading.Thread to prevent actual thread creation
+    mock_thread = MagicMock()
+    monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
+
+    # When: The main function is called and the user selects option 3
+    with patch("builtins.input", lambda _: None):  # Mock input to prevent blocking
+        user_tool_main.main()
+
+    # Then: The logger should log the exit message
+    mock_logger.info.assert_any_call("Exiting User Tool.")
+    mock_thread.start.assert_called_once()  # Ensure the thread's start method was called

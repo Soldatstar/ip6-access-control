@@ -31,12 +31,14 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
         nonlocal after_id
         if decision['value'] is None:
             decision['value'] = choice
+            q.put(choice)  # Ensure the decision is added to the queue for consistency
             if after_id is not None:
                 try:
                     root.after_cancel(after_id)
                 except tk.TclError:
                     pass
-            root.destroy()
+            if root.winfo_exists():  # Ensure root exists before attempting to destroy
+                root.destroy()
 
     def ask_cli():
         prompt = (
