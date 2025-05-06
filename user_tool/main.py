@@ -23,8 +23,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from user_tool import policy_manager
 from user_tool import utils
 from shared import logging_config
-
-
+from user_tool.policy_manager import Policy
 
 # Directories
 BASE_DIR = Path(__file__).resolve().parent.parent / "process-supervisor"
@@ -168,13 +167,17 @@ def handle_requests():
             case "ALLOW":
                 LOGGER.info("User allowed the request for %s (hash: %s)",
                             program_name, program_hash)
-                policy_manager.save_decision(
-                    program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+                policy = Policy(
+                    program_path, program_hash, syscall_nr, "ALLOW", "placeholder_user", parameter
+                )
+                policy_manager.save_decision(policy)
             case "DENY":
                 LOGGER.info("User denied the request for %s (hash: %s)",
                             program_name, program_hash)
-                policy_manager.save_decision(
-                    program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+                policy = Policy(
+                    program_path, program_hash, syscall_nr, "DENY", "placeholder_user", parameter
+                )
+                policy_manager.save_decision(policy)
             case _:
                 LOGGER.error("Unknown response: %s", response)
                 response = "DENY"
