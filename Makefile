@@ -34,7 +34,7 @@ run:
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM)
 
 ut:
-	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool.py
+	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/main.py
 
 test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run -m pytest -v
