@@ -21,7 +21,7 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Test with pytest
         run: |
-          coverage run -m pytest  -v -s
+          coverage run --source=supervisor,user_tool,tests --omit=tests/* -m pytest -vv
       - name: Generate Coverage Report
         run: |
           coverage report -m

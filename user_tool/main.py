@@ -125,7 +125,7 @@ def handle_requests():
             continue
         logger.info(f"Handling request for {program_name} (hash: {program_hash})")
         logger.info(f"Syscall: {syscall_name} (ID: {syscall_nr} parameter: {parameter})")
-        response = ask_permission(syscall_nr, program_name, program_hash, parameter_formated, logger)
+        response = utils.ask_permission(syscall_nr, program_name, program_hash, parameter_formated, logger)
 
         match response:
             case "ONE_TIME":  # Allow for one time without saving
@@ -133,10 +133,10 @@ def handle_requests():
                 response = "ALLOW"
             case "ALLOW":
                 logger.info(f"User allowed the request for {program_name} (hash: {program_hash})")
-                save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+                policy_manager.save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case "DENY":
                 logger.info(f"User denied the request for {program_name} (hash: {program_hash})")
-                save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
+                policy_manager.save_decision(program_name, program_path, program_hash, syscall_nr, response, "placeholder_user", parameter)
             case _:
                 logger.error(f"Unknown response: {response}")
                 response = "DENY"
@@ -164,7 +164,7 @@ def main():
 
         logger.info("Waiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
-            choice = non_blocking_input("")
+            choice = utils.non_blocking_input("")
             if choice:
                 break
 

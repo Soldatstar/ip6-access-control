@@ -1,4 +1,3 @@
-
 import os
 import json
 import datetime
@@ -60,7 +59,7 @@ def list_known_apps():
         logger.info("No policies directory found.")
         return
 
-    apps = os.listdir(POLICIES_DIR)
+    apps = sorted(os.listdir(POLICIES_DIR))  # Sort the apps list for consistent order
     if not apps:
         logger.info("No known applications with policies.")
     else:

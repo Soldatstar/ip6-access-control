@@ -6,6 +6,9 @@ ACTIVATE_LINUX = source $(VENV_DIR)/bin/activate
 SHELL := /bin/bash
 DEMOPROGRAM = demo/file-access
 DEMOCPROGRAM = demo/file-access.c
+SUPERVISOR_DIR = supervisor
+USER_TOOL_DIR = user_tool
+TEST_DIR = tests
 
 # Hilfsnachricht
 help:
@@ -25,13 +28,14 @@ create:
 # Ziel zum Löschen des virtuellen Environments
 delete:
 	rm -rf $(VENV_DIR)
-	rm $(DEMOPROGRAM)
-	rm -r process-supervisor/
-	rm -r user_tool/__pycache__/
-	rm -r shared/__pycache__/
-	rm -r tests/__pycache__/
-	rm -r .pytest_cache
-	rm .coverage
+	-rm -f $(DEMOPROGRAM)
+	rm -rf process-supervisor/
+	rm -rf user_tool/__pycache__/
+	rm -rf shared/__pycache__/
+	rm -rf tests/__pycache__/
+	rm -rf .pytest_cache
+	rm -rf __pycache__/
+	-rm -f .coverage
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
@@ -41,6 +45,6 @@ ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/main.py
 
 test:
-	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run -m pytest -v
-	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report
+	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
+	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report 
 .PHONY: help create delete run
