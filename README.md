@@ -1,26 +1,36 @@
-# Linux Access Control Tool
+# 25FS_IMVS14: System zur feingranularen Ressourcen-Zugriffskontrolle unter Linux  
+## IP6 Bachelorarbeit  
 
 [![codecov](https://codecov.io/gh/Soldatstar/ip6-access-control/branch/main/graph/badge.svg)](https://codecov.io/gh/Soldatstar/ip6-access-control)
 
-## Problematik:
+### Problematik
 
-Linux bietet Möglichkeiten zur Kontrolle des Zugriffs auf Systemressourcen wie Dateien oder Netzwerkverbindungen (z.B. AppArmor, SELinux). Allerdings haben diese vorhandenen Mechanismen folgende Nachteile:
+[Projektbeschreibung](Projektbeschreibung.pdf)  
 
-* **Ungenauigkeit:**
-Die bestehenden Regeln erlauben oft nur sehr allgemeine Zugriffsbeschränkungen.
-* **Komplexität:**
-Die Einrichtung dieser Regeln erfordert spezialisiertes Wissen, und die Konfiguration ist statisch, d.h., sie ändert sich nicht dynamisch, während das Programm läuft.
-* **Mangelnde Benutzerinteraktion:**
-Benutzer werden nicht aktiv über Zugriffsversuche informiert und haben keine Möglichkeit, diese in der jeweiligen Situation zu erlauben oder zu verbieten.
+Linux bietet verschiedene Mechanismen zur Kontrolle des Zugriffs auf Systemressourcen wie Dateien oder Netzwerkverbindungen (z. B. AppArmor, SELinux). Diese Mechanismen weisen jedoch folgende Schwächen auf:
 
-## Lösung:
+- **Ungenauigkeit:** Die Regeln sind oft zu allgemein und erlauben keine feingranulare Zugriffskontrolle.
+- **Komplexität:** Die Konfiguration erfordert spezialisiertes Wissen und ist statisch, d. h., sie passt sich nicht dynamisch an.
+- **Mangelnde Benutzerinteraktion:** Benutzer werden nicht aktiv über Zugriffsversuche informiert und können diese nicht situativ erlauben oder verweigern.
 
-Linux Access Control ist ein benutzerfreundliches Werkzeug, mit dem Sie den Zugriff von Programmen auf Ressourcen unter Linux steuern können.
+### Lösung
 
-1. **Überwachung:** Das Programm überwacht, welche Systemaufrufe Programme verwenden, um auf wichtige Dateien zuzugreifen.
-2. **Benutzerkontrolle:** Wenn ein Programm versucht, auf eine kritische Datei zuzugreifen, werden Sie gefragt, ob dieser Zugriff erlaubt werden soll. Sie können den Zugriff erlauben oder dauerhaft für dieses Programm blockieren.
-3. **Verständliche Fragen:** Die Systemaufrufe und ihre Parameter werden in einfache Fragen übersetzt, damit Sie leicht entscheiden können, ob der Zugriff sinnvoll ist.
+[Projektvereinbarung](Projektvereinbarung.pdf)  
 
-## Benutzung:
+Linux Access Control ist ein benutzerfreundliches Werkzeug, das die Steuerung des Zugriffs von Programmen auf Ressourcen unter Linux ermöglicht. Es bietet:
 
-Wird später beschrieben....
+1. **Überwachung:** Überwachung von Systemaufrufen, die Programme nutzen, um auf kritische Dateien zuzugreifen.
+2. **Benutzerkontrolle:** Interaktive Abfragen, ob ein Zugriff erlaubt oder dauerhaft blockiert werden soll.
+3. **Verständliche Kommunikation:** Übersetzung von Systemaufrufen und Parametern in leicht verständliche Fragen, um fundierte Entscheidungen zu ermöglichen.
+
+### 🛠️ Benutzung  
+
+#### Schnellstart  
+```bash
+# Build-Prozess
+make create # Erstellt eine Python-Umgebung und kompiliert den C-Code
+
+# In zwei separaten Terminals ausführen:
+make ut   # Startet das User-Tool und wartet auf Anfragen über ZMQ
+make run  # Startet den Supervisor mit einer Demo für Datei-Zugriffe
+```
