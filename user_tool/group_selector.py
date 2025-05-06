@@ -1,14 +1,13 @@
 import os
 import re
 
-FILE_NAME = "groups"
 GROUPS_ORDER = []  # List to store the order of groups
 GROUPS_PARAMETER_ORDER = {}  # Dictionary to store the order of parameters for each group
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
 
-def parse_file():
+def parse_file(filename):
     argument_name = None  
     argument_values = []  
     group_name = None  
@@ -16,7 +15,7 @@ def parse_file():
     parameter_name = None  
     parameter_values = []  
 
-    with open(FILE_NAME, 'r') as file:
+    with open(filename, 'r') as file:
         for line in file:
             # Remove leading/trailing whitespace
             line = line.strip()  
@@ -99,18 +98,3 @@ def get_question(syscall_nr, argument):
     
     # If no matching parameter is found, return "-1"
     return "-1"
-
-if __name__ == "__main__":
-    if os.path.exists(FILE_NAME):
-        parse_file()
-        print(get_question(syscall_nr=79,argument=["X_OK"]))
-        print(get_question(syscall_nr=3,argument=["/etc/passwd"]))
-        print("---")
-        print(GROUPS_ORDER)
-        print(GROUPS_PARAMETER_ORDER)
-        print(GROUPS_SYSCALL)
-        print(PARAMETERS)
-        print(ARGUMENTS)
-
-    else:
-        print(f"File {FILE_NAME} not found")
