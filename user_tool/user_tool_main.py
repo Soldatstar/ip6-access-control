@@ -21,7 +21,7 @@ import zmq
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from user_tool import policy_manager
-from user_tool import utils
+from user_tool import user_interaction
 from shared import logging_config
 from user_tool.policy_manager import Policy
 
@@ -155,7 +155,7 @@ def handle_requests():
                     program_name, program_hash)
         LOGGER.info("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
-        response = utils.ask_permission(
+        response = user_interaction.ask_permission(
             syscall_nr, program_name, program_hash, parameter_formated, LOGGER)
 
         match response:
@@ -213,7 +213,7 @@ def main():
 
         LOGGER.info("Waiting for user input...")
         while not NEW_REQUEST_EVENT.is_set():
-            choice = utils.non_blocking_input("")
+            choice = user_interaction.non_blocking_input("")
             if choice:
                 break
 

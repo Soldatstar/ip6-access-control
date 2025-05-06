@@ -8,7 +8,7 @@ This module contains unit tests for the following functionalities:
 
 import sys
 from unittest.mock import MagicMock
-from user_tool import utils
+from user_tool import user_interaction
 
 
 def test_non_blocking_input_with_input(monkeypatch):
@@ -22,7 +22,7 @@ def test_non_blocking_input_with_input(monkeypatch):
     sys.stdin.readline = MagicMock(return_value="test_input\n")
 
     # When: The function is called
-    result = utils.non_blocking_input("Enter something: ", timeout=1.0)
+    result = user_interaction.non_blocking_input("Enter something: ", timeout=1.0)
 
     # Then: The result should match the user input
     assert result == "test_input"
@@ -37,7 +37,7 @@ def test_non_blocking_input_no_input(monkeypatch):
     monkeypatch.setattr("select.select", lambda r, w, x, timeout: ([], [], []))
 
     # When: The function is called
-    result = utils.non_blocking_input("Enter something: ", timeout=1.0)
+    result = user_interaction.non_blocking_input("Enter something: ", timeout=1.0)
 
     # Then: The result should be None
     assert result is None

@@ -44,7 +44,7 @@ run:
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM)
 
 ut:
-	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/main.py
+	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py
 
 test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
