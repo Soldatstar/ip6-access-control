@@ -1,12 +1,14 @@
-a: critical-directories {
+# This configuration file follows a specific structure for defining groups of system calls with parameters:
+# - Arguments must be defined before groups with "a:" and "()" brackets.
+# - Parameters are allowed only within groups and are specified with "p:" and "[]" brackets.
+# - Each group starts with the system call number on each line and are specified with "g:" and "{}" brackets.
+# - Parameters are asked sequentially. Once all arguments for a system call hit, the question is thrown.
+# - If a parameter is not explicitly provided, all values for the parameter are implicitly assumed.
+
+a: critical-directories (
     /root
     /boot 
-}
-
-a: normal-directories {
-    /home
-    /tmp
-}
+)
 
 g: AccessFile {
     2 open(const char *pathname, int flags, mode_t mode)
@@ -14,16 +16,11 @@ g: AccessFile {
     257 openat(int dirfd, const char *pathname, int flags, mode_t mode)
     437 openat2(int dirfd, const char *pathname, const struct open_how *how, size_t size)
 
-    p: Do you want to allow access to critical directories? {
+    p: Do you want to allow access to critical directories? [
         pathname = critical-directories
-        flags = *
-        mode
-        dirfd
-        how
-        size
-    }
+    ]
 
-    p: Do you want to allow access to directories? {
+    p: Do you want to allow access to directories? [
        
-    }
+    ]
 }
