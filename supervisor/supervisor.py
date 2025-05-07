@@ -179,10 +179,8 @@ def main():
 
             if syscall.result is None:
                 syscall_number = syscall.syscall
-                syscall_args = prepare_arguments(
-                    syscall_args=syscall.arguments)
-                syscall_args_formated = [arg.format()
-                                         for arg in syscall.arguments]
+                syscall_args = prepare_arguments(syscall_args=syscall.arguments)
+                syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args
 
                 if not is_already_decided(syscall_nr=syscall_number, arguments=syscall_args):

@@ -3,8 +3,9 @@ import threading
 import queue
 import select
 import sys
+import group_selector
 
-def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, logger):
+def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw, logger):
     """
     Prompt the user for permission to allow or deny a syscall operation.
 
@@ -26,6 +27,10 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
+    args = group_selector.argument_separator(argument_raw=parameter_raw, argument_pretty=parameter_formated)
+    print(parameter_raw)
+    print(parameter_formated)
+    print(args)
 
     def set_decision(choice):
         nonlocal after_id

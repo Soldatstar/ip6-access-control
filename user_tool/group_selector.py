@@ -87,7 +87,6 @@ def get_question(syscall_nr, argument):
                         for a in ARGUMENTS[value]:
                             if a in argument:
                               counter += 1
-                              break
                           
                     # If the length of the given argument is not 0 and all arguments match
                     if len(argument) != 0 and counter == len(argument):
@@ -97,4 +96,19 @@ def get_question(syscall_nr, argument):
                         return parameter 
     
     # If no matching parameter is found, return "-1"
-    return "-1"
+    return -1
+
+def argument_separator(argument_raw, argument_pretty):
+    argument_values = []
+
+    for i in range(len(argument_raw)):
+        if argument_raw[i] != "*":
+            pretty_value = argument_pretty[i]
+            if "[filename]" in pretty_value:
+                argument_values.append(pretty_value.split("[")[0])
+            elif "[flags]" in pretty_value or "[mode]" in pretty_value:
+                flag_mode_values = pretty_value.split("[")[0]
+                extracted_values = [val for val in flag_mode_values.split("|") if any(c.isupper() for c in val)]
+                argument_values.extend(extracted_values)
+
+    return argument_values
