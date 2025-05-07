@@ -95,20 +95,35 @@ def get_question(syscall_nr, argument):
                     elif len(argument) == 0 and len(PARAMETERS[parameter]) == 0:
                         return parameter 
     
-    # If no matching parameter is found, return "-1"
+    # If no matching parameter is found, return -1
     return -1
 
 def argument_separator(argument_raw, argument_pretty):
     argument_values = []
 
     for i in range(len(argument_raw)):
+        # Check if the current element in argument_raw is not '*'
         if argument_raw[i] != "*":
             pretty_value = argument_pretty[i]
+            
+            # Check if the argument is from type filename
             if "[filename]" in pretty_value:
-                argument_values.append(pretty_value.split("[")[0])
+                # Extract the filename value and add it to argument values
+                filename_value = pretty_value.split("[")[0].strip("'")
+                if filename_value != '':
+                    argument_values.append(filename_value)
+            
+            # Check if the argument is from type flags or mode
             elif "[flags]" in pretty_value or "[mode]" in pretty_value:
-                flag_mode_values = pretty_value.split("[")[0]
-                extracted_values = [val for val in flag_mode_values.split("|") if any(c.isupper() for c in val)]
-                argument_values.extend(extracted_values)
+                # Split the flags by '|'
+                parts = pretty_value.split("[")[0].split('|')
+                
+                # Cut all digits that are not A-Z or _
+                def clean_part(part):
+                    cleaned = re.sub(r'[^A-Z_]', '', part)
+                    return cleaned
+
+                flag_mode_values = [clean_part(part) for part in parts if clean_part(part) != '']
+                argument_values.extend(flag_mode_values)
 
     return argument_values

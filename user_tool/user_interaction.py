@@ -19,6 +19,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
         program_name (str): The name of the program requesting the syscall.
         program_hash (str): A unique hash representing the program.
         parameter_formated (str): A formatted string of the syscall parameters.
+        parameter_raw (str): A unformatted string of the syscall parameters.
         logger (logging.Logger): A logger instance for logging messages.
 
     Returns:
@@ -27,10 +28,16 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
-    args = group_selector.argument_separator(argument_raw=parameter_raw, argument_pretty=parameter_formated)
-    print(parameter_raw)
-    print(parameter_formated)
-    print(args)
+    
+    group_selector.parse_file
+    args = group_selector.argument_separator(
+        argument_raw=parameter_raw, 
+        argument_pretty=parameter_formated
+    )
+    question = group_selector.get_question(syscall_nr=syscall_nr,argument=args)
+
+    if question == -1:
+        question = f"Allow operation for syscall {syscall_nr}"
 
     def set_decision(choice):
         nonlocal after_id
@@ -47,7 +54,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
 
     def ask_cli():
         prompt = (
-            f"Allow operation for syscall {syscall_nr}?\n"
+            f"{question}?\n"
             f"            Program: {program_name}\n"
             f"            Hash: {program_hash}\n"
             #f"            Parameter: {parameter_formated}\n"
@@ -91,7 +98,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     lbl = tk.Label(
         root,
         text=(
-            f"Allow operation for syscall {syscall_nr}?\n"
+            f"{question}?\n"
             f"Program: {program_name}\n"
             f"Hash: {program_hash}\n"
             #f"Parameter: {parameter_formated}"
