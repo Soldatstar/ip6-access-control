@@ -31,6 +31,7 @@ delete:
 	-rm -f $(DEMOPROGRAM)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
+	rm -rf supervisor/__pycache__/
 	rm -rf shared/__pycache__/
 	rm -rf tests/__pycache__/
 	rm -rf tests/.pytest_cache
@@ -50,4 +51,7 @@ test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage html
+pylint:
+	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py') 
+
 .PHONY: help create delete run
