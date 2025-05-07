@@ -5,6 +5,9 @@ import select
 import sys
 from . import group_selector
 
+# Configuration file for the syscall conversion with parameters for the appropriate question.
+GROUP_FILE = "user_tool/groups"
+
 def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw, logger):
     """
     Prompt the user for permission to allow or deny a syscall operation.
@@ -29,7 +32,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     q = queue.Queue()
     after_id = None
     
-    group_selector.parse_file
+    group_selector.parse_file(filename=GROUP_FILE)
     args = group_selector.argument_separator(
         argument_raw=parameter_raw, 
         argument_pretty=parameter_formated

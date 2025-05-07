@@ -11,6 +11,10 @@ a: critical-directories (
     /boot 
 )
 
+a: program-path (
+    demo/file-access
+)
+
 g: AccessFile {
     2 open(const char *pathname, int flags, mode_t mode)
     85 creat(const char *pathname, mode_t mode)
@@ -23,5 +27,13 @@ g: AccessFile {
 
     p: Do you want to allow access to directories? [
        
+    ]
+}
+
+g: ExecuteProgram {
+    59 execve (const char *pathname, char *const argv[], char *const envp[])
+
+    p: Do you want to allow execution of program called file-access? [
+        pathname = program-path
     ]
 }
