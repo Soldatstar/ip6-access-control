@@ -66,6 +66,7 @@ def test_ask_permission_timeout(monkeypatch):
                 program_name="test_program",
                 program_hash="test_hash",
                 parameter_formated="formatted_param",
+                parameter_raw="raw_param",
                 logger=MagicMock()
             )
 

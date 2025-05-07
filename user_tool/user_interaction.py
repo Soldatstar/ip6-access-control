@@ -3,7 +3,7 @@ import threading
 import queue
 import select
 import sys
-import group_selector
+from . import group_selector
 
 def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw, logger):
     """
