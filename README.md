@@ -1,7 +1,10 @@
+[![PyPI](https://img.shields.io/pypi/v/ip6-access-control)](https://pypi.org/project/ip6-access-control)
+[![Python Versions](https://img.shields.io/pypi/pyversions/ip6-access-control)](https://pypi.org/project/ip6-access-control)
+[![codecov](https://codecov.io/gh/Soldatstar/ip6-access-control/branch/main/graph/badge.svg)](https://codecov.io/gh/Soldatstar/ip6-access-control)
+[![GitHub Actions test](https://github.com/soldatstar/ip6-access-control/actions/workflows/python-tests.yml/badge.svg)](https://github.com/Soldatstar/ip6-access-control/actions)
+[![GitHub Actions build](https://github.com/soldatstar/ip6-access-control/actions/workflows/build-upload.yml/badge.svg)](https://github.com/Soldatstar/ip6-access-control/actions)
 # 25FS_IMVS14: System zur feingranularen Ressourcen-Zugriffskontrolle unter Linux  
 ## IP6 Bachelorarbeit  
-
-[![codecov](https://codecov.io/gh/Soldatstar/ip6-access-control/branch/main/graph/badge.svg)](https://codecov.io/gh/Soldatstar/ip6-access-control)
 
 ### Problematik
 
@@ -23,7 +26,7 @@ Linux Access Control ist ein benutzerfreundliches Werkzeug, das die Steuerung de
 2. **Benutzerkontrolle:** Interaktive Abfragen, ob ein Zugriff erlaubt oder dauerhaft blockiert werden soll.
 3. **Verständliche Kommunikation:** Übersetzung von Systemaufrufen und Parametern in leicht verständliche Fragen, um fundierte Entscheidungen zu ermöglichen.
 
-### 🛠️ Benutzung  
+###  Benutzung  
 
 #### Schnellstart  
 ```bash
