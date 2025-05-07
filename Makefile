@@ -18,6 +18,8 @@ help:
 	@echo "  make run: Aktiviert das virtuelle Environment und führt supervisor.py aus (Linux)."
 	@echo "  make ut: Aktiviert das virtuelle Environment und führt user_tool.py aus (Linux)."
 	@echo "  make test: Aktiviert das virtuelle Environment und führt die Tests aus (Linux)."
+	@echo "  make pylint: Aktiviert das virtuelle Environment und führt pylint aus (Linux)."
+	@echo "  make build: Aktiviert das virtuelle Environment und erstellt das Projekt (Linux)."
 # Ziel zum Erstellen des virtuellen Environments und Installieren der Abhängigkeiten
 create: 
 	$(PYTHON) -m venv $(VENV_DIR) 
@@ -39,6 +41,9 @@ delete:
 	rm -rf __pycache__/
 	rm -rf htmlcov/
 	-rm -f .coverage
+	rm -rf dist/
+	rm -rf env/
+	rm -rf ip6_access_control.egg-info
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
@@ -53,5 +58,6 @@ test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage html
 pylint:
 	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py') 
-
+build:
+	$(ACTIVATE_LINUX) && $(PYTHON) -m build
 .PHONY: help create delete run
