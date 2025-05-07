@@ -41,4 +41,4 @@ supervisor = "supervisor.supervisor:main"
 user-tool  = "user_tool.user_tool_main:main"
 
 [tool.setuptools]
-packages = ["user_tool", "supervisor", "shared", "tests"]
+packages = { find = { exclude = ["tests"] } }
