@@ -13,7 +13,7 @@ def setup_directories(log_file_name, logger_name):
         logger_name (str): The name of the logger.
 
     Returns:
-        tuple: A tuple containing the paths to the base directory, policies directory, logs directory, and logger.
+        tuple: A tuple containing the paths to the policies directory, logs directory, and logger.
     """
     # Ensure required directories exist
     POLICIES_DIR.mkdir(parents=True, exist_ok=True)
