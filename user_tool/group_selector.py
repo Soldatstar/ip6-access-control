@@ -1,4 +1,10 @@
-import os
+"""
+Group Selector module for managing syscall groups and parameters.
+
+This module provides functionality to parse a configuration file, extract syscall groups,
+parameters, and arguments, and match syscalls with their corresponding parameters and arguments.
+"""
+
 import re
 import logging
 GROUPS_ORDER = []  # List to store the order of groups
@@ -10,6 +16,12 @@ ARGUMENTS = {}  # Dictionary to store the arguments
 LOGGER = logging.getLogger("User-Tool")
 
 def parse_file(filename):
+    """
+    Parse a configuration file to extract syscall groups, parameters, and arguments.
+
+    Args:
+        filename (str): Path to the configuration file.
+    """
     argument_name = None
     argument_values = []
     group_name = None
@@ -78,6 +90,16 @@ def parse_file(filename):
 
 
 def get_question(syscall_nr, argument):
+    """
+    Get the parameter question for a given syscall and its arguments.
+
+    Args:
+        syscall_nr (int): Number of the syscall.
+        argument (list): Arguments of the syscall.
+
+    Returns:
+        str: The parameter question if found, otherwise -1.
+    """
     for groups in GROUPS_ORDER:
         for syscall in GROUPS_SYSCALL[groups]:
             # If the current system call matches the given syscall_nr
@@ -106,11 +128,20 @@ def get_question(syscall_nr, argument):
 
 
 def argument_separator(argument_raw, argument_pretty):
+    """
+    Separate syscall arguments from their formatted strings.
+
+    Args:
+        argument_raw (list): Raw arguments of the syscall.
+        argument_pretty (list): Formatted arguments of the syscall.
+
+    Returns:
+        list: Extracted arguments.
+    """
     argument_values = []
 
-    for i in range(len(argument_raw)):
-        # Check if the current element in argument_raw is not '*'
-        if argument_raw[i] != "*":
+    for i, raw_value in enumerate(argument_raw):
+        if raw_value != "*":
             pretty_value = argument_pretty[i]
 
             # Check if the argument is from type filename
