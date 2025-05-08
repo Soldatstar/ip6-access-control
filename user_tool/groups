@@ -2,7 +2,7 @@
 # - Arguments must be defined before groups with "a:" and "()" brackets.
 # - Parameters are allowed only within groups and are specified with "p:" and "[]" brackets.
 # - Each group starts with the system call number on each line and are specified with "g:" and "{}" brackets.
-# - Parameters are asked sequentially. Once all arguments for a system call hit, the question is thrown.
+# - Parameters are asked sequentially, they need to end with "?". Once all arguments for a system call hit, the question is thrown.
 # - If a parameter is not explicitly provided, all values for the parameter are implicitly assumed.
 # - Values for parameter must be declared as arguments and assigned using "="
 
@@ -35,5 +35,13 @@ g: ExecuteProgram {
 
     p: Do you want to allow execution of program called file-access? [
         pathname = program-path
+    ]
+}
+
+g: {
+    12 brk(void *addr)
+
+    p: Do you want the size of the heap memory to be changed? [
+
     ]
 }
