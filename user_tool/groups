@@ -6,29 +6,37 @@
 # - If a parameter is not explicitly provided, all values for the parameter are implicitly assumed.
 # - Values for parameter must be declared as arguments and assigned using "="
 
-a: critical-directories (
-    /root
-    /boot 
-)
-
 a: program-path (
     demo/file-access
 )
 
-g: AccessFile {
-    2 open(const char *pathname, int flags, mode_t mode)
-    85 creat(const char *pathname, mode_t mode)
-    257 openat(int dirfd, const char *pathname, int flags, mode_t mode)
-    437 openat2(int dirfd, const char *pathname, const struct open_how *how, size_t size)
+a: critical-files (
+    demo/file
+)
 
-    p: Do you want to allow access to critical directories? [
-        pathname = critical-directories
-    ]
+a: etc-directories (
+    /etc/ld.so.preload
+    /etc/ld.so.cache
+)
 
-    p: Do you want to allow access to directories? [
-       
-    ]
-}
+a: lib-directories (
+    /lib/x86_64-linux-gnu/libc.so.6
+)
+
+a: read-mode (
+    R_OK
+)
+
+a: read-flag (
+    O_RDONLY
+    O_CLOEXEC
+)
+
+a: clone-flag (
+    SIGCHLD
+    CLONE_CHILD_CLEARTID
+    CLONE_CHILD_SETTID
+)
 
 g: ExecuteProgram {
     59 execve (const char *pathname, char *const argv[], char *const envp[])
@@ -38,10 +46,130 @@ g: ExecuteProgram {
     ]
 }
 
-g: {
+g: HeapAlloc {
     12 brk(void *addr)
 
     p: Do you want the size of the heap memory to be changed? [
 
     ]
+}
+
+g: MemoryMapping {
+    9 *mmap(void addr[.length], size_t length, int prot, int flags, int fd, off_t offset)
+    11 munmap(void addr[.length], size_t length);
+
+    p: Do you want files or devices to be mapped into memory? [
+
+    ]
+}
+
+g: Permission {
+    21 access(const char *pathname, int mode)
+    262 fstatat(int dirfd, const char *restrict pathname, struct stat *restrict statbuf, int flags);
+
+    p: Is it permissible to check if read permissions exist on /etc? [
+        pathname = etc-directories
+        mode = read-mode
+    ]
+
+    p: Do you allow file status queries? [
+
+    ]
+}
+
+g: FileAccess {
+    257 openat(int dirfd, const char *pathname, int flags, ... /* mode_t mode */)
+    0 read(int fd, void buf[.count], size_t count)
+    17 pread(int fd, void buf[.count], size_t count, off_t offset)
+
+    p: Do you want to enable reading files on /etc? [
+        pathname = etc-directories
+        flag = read-flag
+    ]
+
+    p: Do you want to enable reading files on /lib? [
+        pathname = lib-directories
+        flag = read-flag
+    ]
+
+    p: Do you want to allow opening file demo/file? [
+        pathname = critical-files
+        flag = read-flag
+    ]
+
+    p: Do you want to enable reading if filedescriptor is available? [
+
+    ]
+}
+
+g: FileDescClose {
+    3 close(int fd)
+
+    p: Do you wand to allow closing filedescriptor? [
+
+    ]
+}
+
+g: ArchitectureSettings {
+    158 syscall(SYS_arch_prctl, int op, unsigned long addr);
+
+    p: Do you allow setting architecture-specific configurations? [
+
+    ]
+}
+
+g: ThreadHandle {
+    218 syscall(SYS_set_tid_address, int *tidptr);
+
+    p: Do you want to allow the thread ID to be stored? [
+
+    ]
+}
+
+g: LockHandle {
+    273 syscall(SYS_set_robust_list, struct robust_list_head *head, size_t len)
+
+    p: Do you want to allow the system to track which locks a thread holds in case it crashes? [
+
+    ]
+}
+
+g: UserSpace {
+    334 syscall(SYS_rseq, struct rseq *rseq, uint32_t rseq_len, int flags, uint32_t sig)
+
+    p: Do you want to allow your program to run certain critical sections more efficiently without relying on expensive system calls? [
+
+    ]
+}
+
+g: MemoryProtection {
+    10 pkey_mprotect(void addr[.len], size_t len, int prot, int pkey)
+
+    p: Do you want to allow setting protection for a region of memory? [
+
+    ]
+}
+
+g: RessourceLimit {
+    302 prlimit(pid_t pid, int resource, const struct rlimit *_Nullable new_limit, struct rlimit *_Nullable old_limit)
+
+    p: Do you want to allow setting resource limits for a specific process? [
+
+    ]
+}
+
+g: ChildProcess {
+    56 clone(int (*fn)(void *_Nullable), void *stack, int flags, void *_Nullable arg, ...)
+
+    p: Do you allow starting child processes? [
+        flags = clone-flag   
+    ]
+}
+
+g: ExitProgram {
+    231 syscall(SYS_exit_group, int status)
+    
+    p: Do you allow termination of program? {
+
+    }
 }
