@@ -5,31 +5,7 @@ This module contains unit tests for the following functionalities:
 - Parsing a groups file to extract syscall numbers, parameters, and arguments.
 - Matching syscalls with their corresponding parameters and arguments.
 """
-import pytest
 from user_tool import group_selector
-
-@pytest.fixture
-def mock_groups_file(tmp_path):
-    """
-    Create a mock groups file for testing.
-    """
-    content = """
-    g:group1
-        1
-        2
-    }
-    p:parameter1
-        key1=value1
-        key2=value2
-    ]
-    a:arg1
-        value1
-        value2
-    )
-    """
-    file_path = tmp_path / "groups"
-    file_path.write_text(content)
-    return str(file_path)
 
 def test_argument_separator_valid_arguments():
     """
