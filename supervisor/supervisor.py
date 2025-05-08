@@ -1,3 +1,11 @@
+"""
+Supervisor module for managing system calls.
+
+This module provides functionality to monitor and control system calls made by a child process.
+It uses ptrace for syscall interception and ZeroMQ for communication with a decision-making server.
+The module also supports seccomp for syscall filtering and shared lists for managing allowed and denied syscalls.
+"""
+
 import zmq
 import json
 from sys import stderr, argv, exit
@@ -20,11 +28,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from shared import logging_config, conf_utils
 
 # Directories
-BASE_DIR = Path(__file__).resolve().parent.parent / "process-supervisor"
-POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories(BASE_DIR, "supervisor.log", "Supervisor")
+POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories("supervisor.log", "Supervisor")
 
-# Ensure required directories exist
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configure logging
 log_file_path = LOGS_DIR / "supervisor.log"
@@ -39,6 +44,12 @@ DENY_LIST = MANAGER.list()
 
 
 def init_seccomp(deny_list):
+    """
+    Initialize seccomp rules based on the deny list.
+
+    Args:
+        deny_list (list): A list of denied syscalls and their arguments.
+    """
     f = SyscallFilter(defaction=ALLOW)
 
     for deny_decision in deny_list:
@@ -57,12 +68,25 @@ def init_seccomp(deny_list):
 
 
 def child_prozess(deny_list, argv):
+    """
+    Start the child process with seccomp rules applied.
+
+    Args:
+        deny_list (list): A list of denied syscalls and their arguments.
+        argv (list): Command-line arguments for the child process.
+    """
     init_seccomp(deny_list=deny_list)
     kill(getpid(), SIGUSR1)
     execv(argv[1], [argv[1]]+argv[2:])
 
 
 def setup_zmq() -> zmq.Socket:
+    """
+    Set up a ZeroMQ DEALER socket for communication.
+
+    Returns:
+        zmq.Socket: A configured ZeroMQ socket.
+    """
     context = zmq.Context()
     socket = context.socket(zmq.DEALER)
     socket.connect("tcp://localhost:5556")
@@ -70,6 +94,19 @@ def setup_zmq() -> zmq.Socket:
 
 
 def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_formated, socket) -> str:
+    """
+    Request permission for a syscall via ZeroMQ.
+
+    Args:
+        syscall_name (str): Name of the syscall.
+        syscall_nr (int): Number of the syscall.
+        arguments_raw (list): Raw arguments of the syscall.
+        arguments_formated (list): Formatted arguments of the syscall.
+        socket (zmq.Socket): ZeroMQ socket for communication.
+
+    Returns:
+        str: Decision from the server ("ALLOW" or "DENY").
+    """
     message = {
         "type": "req_decision",
         "body": {
@@ -90,12 +127,24 @@ def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_fo
 
 
 def set_program_path(relative_path):
+    """
+    Set the relative and absolute paths of the program being supervised.
+
+    Args:
+        relative_path (str): Relative path to the program.
+    """
     global PROGRAM_RELATIVE_PATH, PROGRAM_ABSOLUTE_PATH
     PROGRAM_RELATIVE_PATH = relative_path
     PROGRAM_ABSOLUTE_PATH = path.abspath(PROGRAM_RELATIVE_PATH)
 
 
 def init_shared_list(socket):
+    """
+    Initialize the shared ALLOW_LIST and DENY_LIST from the database.
+
+    Args:
+        socket (zmq.Socket): ZeroMQ socket for communication.
+    """
     global ALLOW_LIST, DENY_LIST
     message = {
         "type": "read_db",
@@ -129,6 +178,16 @@ def init_shared_list(socket):
 
 
 def is_already_decided(syscall_nr, arguments):
+    """
+    Check if a decision has already been made for a syscall and its arguments.
+
+    Args:
+        syscall_nr (int): Number of the syscall.
+        arguments (list): Arguments of the syscall.
+
+    Returns:
+        bool: True if the decision is already made, False otherwise.
+    """
     for decision in chain(ALLOW_LIST, DENY_LIST):
         if decision[0] == syscall_nr:
             if Counter(decision[1:]) == Counter(arguments):
@@ -137,6 +196,15 @@ def is_already_decided(syscall_nr, arguments):
 
 
 def prepare_arguments(syscall_args):
+    """
+    Prepare arguments for a syscall based on their type.
+
+    Args:
+        syscall_args (list): List of syscall argument objects.
+
+    Returns:
+        list: Prepared arguments.
+    """
     arguments = []
     for arg in syscall_args:
         match arg.name:
@@ -152,6 +220,12 @@ def prepare_arguments(syscall_args):
 
 
 def main():
+    """
+    Main function to start the supervisor.
+
+    This function sets up the environment, initializes shared lists, and starts the child process.
+    It also monitors syscalls and communicates with the decision-making server.
+    """
     if len(argv) < 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
         LOGGER.info("Nutzung: %s program", argv[0])

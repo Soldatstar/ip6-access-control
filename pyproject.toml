@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name             = "ip6-access-control"
-version          = "0.0.2"
+version          = "0.0.3"
 authors          = [
-  { name = "Viktor Weilenmann", email = "viktor.we@gmx.ch" },
+  { name = "Damjan Mlinar" },
+  { name = "Viktor Weilenmann" },
 ]
 description      = "A project with a supervisor and a central daemon."
 readme           = "README.md"
@@ -15,7 +16,7 @@ classifiers      = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
 ]
-license          = "MIT"
+license          = "GPL-3.0-or-later"
 license-files    = ["LICEN[CS]E*"]
 
 dependencies = [
@@ -27,6 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest==8.3.5",
+  "pytest-mock==3.14.0",
   "coverage==7.8.0",
   "pylint==3.3.7",
   "build==1.2.2.post1",
