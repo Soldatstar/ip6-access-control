@@ -12,8 +12,8 @@ import json
 import datetime
 import shutil
 import logging
-
-POLICIES_DIR = None
+from shared import conf_utils
+POLICIES_DIR = conf_utils.POLICIES_DIR
 LOGGER = logging.getLogger("User-Tool")
 
 
@@ -45,7 +45,7 @@ def save_decision(policy: Policy):
     process_dir = os.path.join(POLICIES_DIR, policy.hash_value)
     os.makedirs(process_dir, exist_ok=True)
     LOGGER.info(
-        f"Saving decision for {policy.name} (hash: {policy.hash_value}) in {process_dir}")
+        "Saving decision for %s (hash: %s) in %s", policy.name, policy.hash_value, process_dir)
     policy_file = os.path.join(process_dir, "policy.json")
 
     # Handle empty or invalid policy files
@@ -55,7 +55,7 @@ def save_decision(policy: Policy):
                 data = json.load(file)
         except (json.JSONDecodeError, FileNotFoundError):
             LOGGER.warning(
-                f"Policy file {policy_file} is empty or invalid. Reinitializing.")
+                "Policy file %s is empty or invalid. Reinitializing.", policy_file)
             data = None
     else:
         data = None
@@ -117,11 +117,11 @@ def list_known_apps():
                         data = json.load(file)
                         process_name = data.get("metadata", {}).get(
                             "process_name", "Unknown")
-                        LOGGER.info(f"- {process_name} (Hash: {app})")
+                        LOGGER.info("- %s (Hash: %s)", process_name, app)
                 except json.JSONDecodeError:
-                    LOGGER.warning(f"- {app} (Invalid policy file)")
+                    LOGGER.warning("- %s (Invalid policy file)", app)
             else:
-                LOGGER.warning(f"- {app} (No policy file found)")
+                LOGGER.warning("- %s (No policy file found)", app)
 
 
 def delete_all_policies():
@@ -140,9 +140,9 @@ def delete_all_policies():
         if os.path.isdir(app_path):
             try:
                 shutil.rmtree(app_path)
-                LOGGER.info(f"Deleted policies for {app}.")
+                LOGGER.info("Deleted policies for %s.", app)
             except OSError as e:
                 LOGGER.error(
-                    f"Failed to delete policies for {app}. Error: {e}")
+                    "Failed to delete policies for %s. Error: %s", app, e)
 
     LOGGER.info("All policies deleted.")

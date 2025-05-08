@@ -45,8 +45,8 @@ def test_list_known_apps_with_policies(tmp_path, monkeypatch):
     # Then: The logger should be called with the expected messages in order
     expected_calls = [
         ("info", ("Known applications with policies:",)),
-        ("info", ("- App1 (Hash: app1)",)),
-        ("info", ("- App2 (Hash: app2)",))
+        ("info", ("- %s (Hash: %s)", "App1", "app1")),
+        ("info", ("- %s (Hash: %s)", "App2", "app2"))
     ]
     actual_calls = [(call[0], call[1]) for call in mock_logger.mock_calls]
     assert expected_calls == actual_calls
@@ -124,7 +124,7 @@ def test_list_known_apps_invalid_policy_file(tmp_path, monkeypatch):
     # Then: The logger should be called with the expected messages
     expected_calls = [
         ("info", ("Known applications with policies:",)),
-        ("warning", ("- app1 (Invalid policy file)",))
+        ("warning", ("- %s (Invalid policy file)", "app1"))
     ]
     actual_calls = [(call[0], call[1]) for call in mock_logger.mock_calls]
     assert expected_calls == actual_calls
@@ -153,8 +153,8 @@ def test_delete_all_policies_with_policies(tmp_path, monkeypatch):
     # Then: The directories should be deleted, and the logger should log the deletions
     assert not any(mock_policies_dir.iterdir())  # Directory should be empty
     expected_calls = [
-        ("info", ("Deleted policies for app1.",)),
-        ("info", ("Deleted policies for app2.",)),
+        ("info", ("Deleted policies for %s.", "app1")),
+        ("info", ("Deleted policies for %s.", "app2")),
         ("info", ("All policies deleted.",))
     ]
     actual_calls = [(call[0], call[1]) for call in mock_logger.mock_calls]

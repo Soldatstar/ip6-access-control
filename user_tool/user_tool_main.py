@@ -26,15 +26,11 @@ from shared import conf_utils
 from user_tool.policy_manager import Policy
 
 # Directories
-BASE_DIR = Path(__file__).resolve().parent.parent / "process-supervisor"
-POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories(BASE_DIR, "user_tool.log", "User-Tool")
+POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories("user_tool.log", "User-Tool")
 
 # Global variables
 REQUEST_QUEUE = queue.Queue()
 NEW_REQUEST_EVENT = threading.Event()
-
-# Delegate variables to policy_manager
-policy_manager.POLICIES_DIR = str(POLICIES_DIR)
 
 def zmq_listener():
     """
