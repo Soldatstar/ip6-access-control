@@ -22,21 +22,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from user_tool import policy_manager
 from user_tool import user_interaction
-from shared import logging_config
+from shared import conf_utils
 from user_tool.policy_manager import Policy
 
 # Directories
 BASE_DIR = Path(__file__).resolve().parent.parent / "process-supervisor"
-POLICIES_DIR = BASE_DIR / "policies"
-LOGS_DIR = BASE_DIR / "logs"
-
-# Ensure required directories exist
-POLICIES_DIR.mkdir(parents=True, exist_ok=True)
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Configure logging
-log_file_path = LOGS_DIR / "user_tool.log"
-LOGGER = logging_config.configure_logging(log_file_path, "User-Tool")
+POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories(BASE_DIR, "user_tool.log", "User-Tool")
 
 # Global variables
 REQUEST_QUEUE = queue.Queue()
@@ -44,8 +35,6 @@ NEW_REQUEST_EVENT = threading.Event()
 
 # Delegate variables to policy_manager
 policy_manager.POLICIES_DIR = str(POLICIES_DIR)
-policy_manager.LOGGER = LOGGER
-
 
 def zmq_listener():
     """
@@ -156,7 +145,7 @@ def handle_requests():
         LOGGER.info("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
         response = user_interaction.ask_permission(
-            syscall_nr, program_name, program_hash, parameter_formated, parameter, LOGGER)
+            syscall_nr, program_name, program_hash, parameter_formated, parameter)
 
         match response:
             case "ONE_TIME":  # Allow for one time without saving

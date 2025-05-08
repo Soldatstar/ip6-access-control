@@ -3,12 +3,13 @@ import threading
 import queue
 import select
 import sys
-from . import group_selector
+import logging
+from user_tool import group_selector
 
 # Configuration file for the syscall conversion with parameters for the appropriate question.
 GROUP_FILE = "user_tool/groups"
-
-def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw, logger):
+LOGGER = logging.getLogger("User-Tool")
+def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw):
     """
     Prompt the user for permission to allow or deny a syscall operation.
 
@@ -31,17 +32,16 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
-    
     group_selector.parse_file(filename=GROUP_FILE)
     args = group_selector.argument_separator(
         argument_raw=parameter_raw, 
         argument_pretty=parameter_formated
     )
     question = group_selector.get_question(syscall_nr=syscall_nr,argument=args)
-
+    LOGGER.info("group_selector.get_question: %s", question)
     if question == -1:
         question = f"Allow operation for syscall {syscall_nr}"
-
+    LOGGER.info("Question: %s", question)
     def set_decision(choice):
         nonlocal after_id
         if decision['value'] is None:
@@ -68,9 +68,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
             'no':  'DENY',    'n': 'DENY',
             'one': 'ONE_TIME','o': 'ONE_TIME',
         }
-
-        logger.info(prompt)
-
+        LOGGER.info(prompt)
         while decision['value'] is None:
             r, _, _ = select.select([sys.stdin], [], [], 4.0)
             if r:
@@ -120,6 +118,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     after_id = root.after(100, poll_queue)
 
     root.mainloop()
+    LOGGER.info("User decision: %s", decision['value'])
     return decision['value']
 
 def non_blocking_input(prompt: str, timeout: float = 0.5) -> str:

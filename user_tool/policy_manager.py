@@ -11,9 +11,10 @@ import os
 import json
 import datetime
 import shutil
+import logging
 
 POLICIES_DIR = None
-LOGGER = None
+LOGGER = logging.getLogger("User-Tool")
 
 
 class Policy:

@@ -17,11 +17,11 @@ from pyseccomp import SyscallFilter, ALLOW, TRAP, Arg, EQ
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from shared import logging_config
+from shared import logging_config, conf_utils
 
 # Directories
 BASE_DIR = Path(__file__).resolve().parent.parent / "process-supervisor"
-LOGS_DIR = BASE_DIR / "logs"
+POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories(BASE_DIR, "supervisor.log", "Supervisor")
 
 # Ensure required directories exist
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
