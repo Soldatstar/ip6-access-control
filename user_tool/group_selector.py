@@ -1,13 +1,13 @@
 import os
 import re
-
+import logging
 GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
-LOGGER = None  # Placeholder for the logger
+LOGGER = logging.getLogger("User-Tool")
 
 def parse_file(filename):
     argument_name = None
@@ -18,6 +18,7 @@ def parse_file(filename):
     parameter_values = []
     try:
         with open(filename, 'r', encoding="UTF-8") as file:
+            LOGGER.info("Parsing groups file: %s", filename)
             for line in file:
                 # Remove leading/trailing whitespace
                 line = line.strip()
@@ -72,8 +73,8 @@ def parse_file(filename):
                 # Add line to parameter values list
                 elif parameter_name:
                     parameter_values.append(line)
-    except Exception as e:
-        print(f"{filename} was not found")
+    except (FileNotFoundError, IOError, ValueError) as e:
+        LOGGER.error("Error parsing file %s: %s", filename, e)
 
 
 def get_question(syscall_nr, argument):
