@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name             = "ip6-access-control"
-version          = "0.0.3"
+version          = "0.0.3.post1"
 authors          = [
   { name = "Damjan Mlinar" },
   { name = "Viktor Weilenmann" },
@@ -14,7 +14,7 @@ readme           = "README.md"
 requires-python  = ">=3.9"
 classifiers      = [
   "Programming Language :: Python :: 3",
-  "Operating System :: OS Independent",
+  "Operating System :: POSIX :: Linux",
 ]
 license          = "GPL-3.0-or-later"
 license-files    = ["LICEN[CS]E*"]

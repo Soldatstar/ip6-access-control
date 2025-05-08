@@ -26,9 +26,9 @@ Linux Access Control ist ein benutzerfreundliches Werkzeug, das die Steuerung de
 2. **Benutzerkontrolle:** Interaktive Abfragen, ob ein Zugriff erlaubt oder dauerhaft blockiert werden soll.
 3. **Verständliche Kommunikation:** Übersetzung von Systemaufrufen und Parametern in leicht verständliche Fragen, um fundierte Entscheidungen zu ermöglichen.
 
-###  Benutzung  
+### Benutzung  
 
-#### Schnellstart  
+#### Schnellstart (als geklonte Repository)
 ```bash
 # Build-Prozess
 make create # Erstellt eine Python-Umgebung und kompiliert den C-Code
@@ -37,3 +37,14 @@ make create # Erstellt eine Python-Umgebung und kompiliert den C-Code
 make ut   # Startet das User-Tool und wartet auf Anfragen über ZMQ
 make run  # Startet den Supervisor mit einer Demo für Datei-Zugriffe
 ```
+#### Schnellstart (als python Installation)
+```bash
+# Installieren Sie das Paket in einer Python-Umgebung
+pip install ip6-access-control
+
+# In zwei separaten Terminals ausführen:
+user-tool               # Startet das User-Tool und wartet auf Anfragen über ZMQ
+supervisor $(which ls)  # Startet den Supervisor mit dem absoluten Pfad des Programms (z. B. "ls")
+```
+
+
