@@ -3,8 +3,12 @@ import threading
 import queue
 import select
 import sys
+from . import group_selector
 
-def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, logger):
+# Configuration file for the syscall conversion with parameters for the appropriate question.
+GROUP_FILE = "user_tool/groups"
+
+def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw, logger):
     """
     Prompt the user for permission to allow or deny a syscall operation.
 
@@ -18,6 +22,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
         program_name (str): The name of the program requesting the syscall.
         program_hash (str): A unique hash representing the program.
         parameter_formated (str): A formatted string of the syscall parameters.
+        parameter_raw (str): A unformatted string of the syscall parameters.
         logger (logging.Logger): A logger instance for logging messages.
 
     Returns:
@@ -26,6 +31,16 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
     decision = {'value': None}
     q = queue.Queue()
     after_id = None
+    
+    group_selector.parse_file(filename=GROUP_FILE)
+    args = group_selector.argument_separator(
+        argument_raw=parameter_raw, 
+        argument_pretty=parameter_formated
+    )
+    question = group_selector.get_question(syscall_nr=syscall_nr,argument=args)
+
+    if question == -1:
+        question = f"Allow operation for syscall {syscall_nr}"
 
     def set_decision(choice):
         nonlocal after_id
@@ -42,7 +57,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
 
     def ask_cli():
         prompt = (
-            f"Allow operation for syscall {syscall_nr}?\n"
+            f"{question}?\n"
             f"            Program: {program_name}\n"
             f"            Hash: {program_hash}\n"
             #f"            Parameter: {parameter_formated}\n"
@@ -86,7 +101,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, l
     lbl = tk.Label(
         root,
         text=(
-            f"Allow operation for syscall {syscall_nr}?\n"
+            f"{question}?\n"
             f"Program: {program_name}\n"
             f"Hash: {program_hash}\n"
             #f"Parameter: {parameter_formated}"
