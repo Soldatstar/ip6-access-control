@@ -82,25 +82,24 @@ def get_question(syscall_nr, argument):
             # If the current system call matches the given syscall_nr
             if syscall == syscall_nr:
                 for parameter in GROUPS_PARAMETER_ORDER[groups]:
-
+                    
+                    parameter_values = set()
                     # Iterate through the arguments for the current parameter
-                    counter = 0
                     for arg in PARAMETERS[parameter]:
                         key, value = arg.split("=")
                         value = value.strip()
-
-                        # Check if any of the arguments in ARGUMENTS[value] are present in the given argument array
+                        
+                        # Add entry to the parameter set
                         for a in ARGUMENTS[value]:
-                            if a in argument:
-                                counter += 1
-
-                    # If the length of the given argument is not 0 and all arguments match
-                    if len(argument) != 0 and counter == len(argument):
+                            parameter_values.add(a)
+                          
+                    # If the length of the given argument is not 0 and all given arguments match the parameter set
+                    if len(argument) != 0 and set(argument).issubset(parameter_values):
                         return parameter
                     # If the length of the given argument is 0 and the parameter has no arguments
-                    elif len(argument) == 0 and len(PARAMETERS[parameter]) == 0:
-                        return parameter
-
+                    elif len(argument) == 0 and not parameter_values:
+                        return parameter 
+    
     # If no matching parameter is found, return -1
     return -1
 
