@@ -6,8 +6,9 @@ This module contains unit tests for the following functionalities:
 """
 
 import json
+import os
 from unittest.mock import MagicMock, patch
-from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments
+from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list,ALLOW_LIST, DENY_LIST
 
 
 def test_ask_for_permission_zmq():
@@ -115,3 +116,95 @@ def test_prepare_arguments():
 
     # Then: The arguments should be correctly prepared
     assert result == ["/path/to/file", "O_RDONLY", "0777", "*"]
+
+
+def test_init_shared_list_success(mocker):
+    """
+    Test initializing the shared list when the server responds successfully.
+    """
+    # Given: Mock socket and server response
+    mock_socket = MagicMock()
+    mock_response = {
+        "status": "success",
+        "data": {
+            "allowed_syscalls": [[2, ["arg1", "arg2"]]],
+            "denied_syscalls": [[3, ["arg3"]]]
+        }
+    }
+    mock_socket.recv_multipart.side_effect = [
+        [b'', json.dumps(mock_response).encode()]
+    ]
+
+    # Mock ALLOW_LIST and DENY_LIST
+    mock_allow_list = mocker.patch("supervisor.supervisor.ALLOW_LIST", [])
+    mock_deny_list = mocker.patch("supervisor.supervisor.DENY_LIST", [])
+
+    # When: The init_shared_list function is called
+    init_shared_list(socket=mock_socket)
+
+    # Then: ALLOW_LIST and DENY_LIST should be populated correctly
+    assert list(mock_allow_list) == [[2, "arg1", "arg2"]]
+    assert list(mock_deny_list) == [[3, "arg3"]]
+
+    # And: The correct message should be sent
+    expected_message = {
+        "type": "read_db",
+        "body": {
+            "program": None  # PROGRAM_ABSOLUTE_PATH is not set in this test
+        }
+    }
+    mock_socket.send_multipart.assert_called_once_with(
+        [b'', json.dumps(expected_message).encode()]
+    )
+
+
+def test_init_shared_list_error(mocker):
+    """
+    Test initializing the shared list when the server responds with an error.
+    """
+    # Given: Mock socket and server response
+    mock_socket = MagicMock()
+    mock_response = {
+        "status": "error",
+        "data": "Database not found"
+    }
+    mock_socket.recv_multipart.side_effect = [
+        [b'', json.dumps(mock_response).encode()]
+    ]
+    mocker.patch("supervisor.supervisor.ALLOW_LIST", [])
+    mocker.patch("supervisor.supervisor.DENY_LIST", [])
+
+    # When: The init_shared_list function is called
+    init_shared_list(socket=mock_socket)
+
+    # Then: ALLOW_LIST and DENY_LIST should remain empty
+    from supervisor.supervisor import ALLOW_LIST, DENY_LIST
+    assert ALLOW_LIST == []
+    assert DENY_LIST == []
+
+    # And: The correct message should be sent
+    expected_message = {
+        "type": "read_db",
+        "body": {
+            "program": None  # PROGRAM_ABSOLUTE_PATH is not set in this test
+        }
+    }
+    mock_socket.send_multipart.assert_called_once_with(
+        [b'', json.dumps(expected_message).encode()]
+    )
+
+
+
+def test_setup_zmq(mocker):
+    """
+    Test setting up a ZeroMQ DEALER socket.
+    """
+    # Given: Mock ZeroMQ context and socket
+    mock_context = mocker.patch("zmq.Context")
+    mock_socket = mock_context.return_value.socket.return_value
+
+    # When: The setup_zmq function is called
+    result = setup_zmq()
+    # Then: The socket should be configured and returned    mock_context.return_value.socket.assert_called_once_with(mocker.ANY)
+    mock_socket.connect.assert_called_once_with("tcp://localhost:5556")
+    assert result == mock_socket
