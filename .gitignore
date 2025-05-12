@@ -2,9 +2,7 @@ env/
 demo/*
 !demo/*.c
 
-# Decision files
 *.log
-*.json
 
 # Demo files
 process-supervisor/

@@ -106,6 +106,13 @@ def handle_requests():
                         LOGGER.debug("Policy for %s: %s",
                                      program_hash, json.dumps(data, indent=4))
                         rules = data.get("rules", {})
+                        # Append default policy to the front of allowed_syscalls
+                        default_policy_path = os.path.join(
+                            Path(__file__).resolve().parent, "default.json")
+                        with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+                            default_data = json.load(default_file)
+                            default_syscalls = default_data.get("rules", {}).get("allowed_syscalls", [])
+                            rules["allowed_syscalls"] = default_syscalls + rules.get("allowed_syscalls", [])
                         response = {
                             "status": "success",
                             "data": rules
@@ -119,10 +126,15 @@ def handle_requests():
                         }
             else:
                 LOGGER.info("No policy found for %s", program_hash)
-                response = {
-                    "status": "error",
-                    "data": {"message": "No policy found"}
-                }
+                # Load default policy
+                default_policy_path = os.path.join(
+                    Path(__file__).resolve().parent, "default.json")
+                with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+                    default_data = json.load(default_file)
+                    response = {
+                        "status": "success",
+                        "data": default_data.get("rules", {})
+                    }
             socket.send_multipart(
                 [identity, b'', json.dumps(response).encode()])
             continue
