@@ -10,6 +10,7 @@ import logging
 GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
+GROUPS_DEFAULT_QUESTION = {} 
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
@@ -40,6 +41,11 @@ def parse_file(filename):
                     continue
 
                 # Extract argument name
+
+                if group_name and line.startswith("d:"):
+                    default_question = line[2:].strip()
+                    GROUPS_DEFAULT_QUESTION[group_name] = default_question
+                    continue  # Skip further processing for this line
                 if line.startswith("a:"):
                     argument_name = line[2:].strip().split()[0]
                 # Store argument values
@@ -74,6 +80,7 @@ def parse_file(filename):
                     parameter_name = line[2:].strip()
                 # Initialize parameter order list for the group
                 elif parameter_name and group_name and line.startswith("]"):
+                    LOGGER.info("initializing group: %s",group_name)
                     if parameter_name not in PARAMETERS:
                         if group_name not in GROUPS_PARAMETER_ORDER:
                             GROUPS_PARAMETER_ORDER[group_name] = []
@@ -85,6 +92,7 @@ def parse_file(filename):
                 # Add line to parameter values list
                 elif parameter_name:
                     parameter_values.append(line)
+        LOGGER.info("Group para. order: %s",GROUPS_PARAMETER_ORDER)               
     except (FileNotFoundError, IOError, ValueError) as e:
         LOGGER.error("Error parsing file %s: %s", filename, e)
 
@@ -101,28 +109,57 @@ def get_question(syscall_nr, argument):
         str: The parameter question if found, otherwise -1.
     """
     for groups in GROUPS_ORDER:
+        LOGGER.info("Processing group: %s", groups)
+        
         for syscall in GROUPS_SYSCALL[groups]:
+            LOGGER.info("Checking syscall: %s against target: %s", syscall, syscall_nr)
+            
             # If the current system call matches the given syscall_nr
             if syscall == syscall_nr:
+                LOGGER.info("Match found! Syscall %s matches target %s", syscall, syscall_nr)
+                
                 for parameter in GROUPS_PARAMETER_ORDER[groups]:
-                    
+                    LOGGER.info("Processing parameter: %s", parameter)
                     parameter_values = set()
+                    
                     # Iterate through the arguments for the current parameter
                     for arg in PARAMETERS[parameter]:
+                        LOGGER.debug("Processing argument: %s", arg)
                         key, value = arg.split("=")
                         value = value.strip()
+                        LOGGER.debug("Parsed key: %s, value: %s", key, value)
                         
                         # Add entry to the parameter set
                         for a in ARGUMENTS[value]:
                             parameter_values.add(a)
-                          
+                            LOGGER.debug("Added to parameter_values: %s", a)
+                    
+                    LOGGER.info("Parameter '%s' has values: %s", parameter, parameter_values)
+                    LOGGER.info("Checking against provided argument: %s", argument)
+                    
                     # If the length of the given argument is not 0 and all given arguments match the parameter set
                     if len(argument) != 0 and set(argument).issubset(parameter_values):
+                        LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
+                        LOGGER.info("Returning parameter: %s", parameter)
                         return parameter
+                        
                     # If the length of the given argument is 0 and the parameter has no arguments
                     elif len(argument) == 0 and not parameter_values:
-                        return parameter 
-    
+                        LOGGER.info("SUCCESS: Empty argument matches empty parameter_values")
+                        LOGGER.info("Returning parameter: %s", parameter)
+                        return parameter
+                    else:
+                        if len(argument) != 0:
+                            LOGGER.warning("MISMATCH: Argument %s not subset of %s", argument, parameter_values)
+                        else:
+                            LOGGER.warning("MISMATCH: Empty argument but parameter has values: %s", parameter_values)
+                default_question = GROUPS_DEFAULT_QUESTION.get(groups, -1)
+                LOGGER.warning("No parameter matched, returning default: %s", default_question)
+                return default_question            
+            else:
+                LOGGER.debug("No match: %s != %s", syscall, syscall_nr)
+
+    LOGGER.warning("No matching parameter found across all groups")
     # If no matching parameter is found, return -1
     return -1
 

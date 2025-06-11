@@ -6,6 +6,9 @@ ACTIVATE_LINUX = source $(VENV_DIR)/bin/activate
 SHELL := /bin/bash
 DEMOPROGRAM = demo/file-access
 DEMOCPROGRAM = demo/file-access.c
+DEMONORMALFILES = demo/normal-file
+DEMOCNORMALFILES = demo/normal-file.c
+
 SUPERVISOR_DIR = supervisor
 USER_TOOL_DIR = user_tool
 TEST_DIR = tests
@@ -26,11 +29,13 @@ create:
 	$(ACTIVATE_LINUX)
 	$(PIP) install -r requirements.txt
 	gcc $(DEMOCPROGRAM) -o $(DEMOPROGRAM)
+	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
 
 # Ziel zum Löschen des virtuellen Environments
 delete:
 	rm -rf $(VENV_DIR)
 	-rm -f $(DEMOPROGRAM)
+	-rm -f $(DEMONORMALFILES)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
 	rm -rf supervisor/__pycache__/
@@ -48,6 +53,9 @@ delete:
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM)
+
+run2: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	
 
 ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py

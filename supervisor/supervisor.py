@@ -253,6 +253,23 @@ def main():
 
             if syscall.result is None:
                 syscall_number = syscall.syscall
+                
+                ######
+
+                #TODO: implement proper blacklist behaviour. this set is for catching all "normal-files" operation
+
+                syscall_id_set = {
+                2, 76, 77, 83, 84, 85, 86, 87, 88, 90, 91, 92, 93, 94, 95,
+                132, 133, 188, 189, 190, 197, 198, 199, 235, 257, 258, 259,
+                260, 263, 265, 266, 268, 280
+                }
+                if syscall_number not in syscall_id_set:
+                    LOGGER.info("skipping non blacklisted call: %s",syscall_number)
+                    process.syscall()
+                    continue
+
+
+                ######
                 syscall_args = prepare_arguments(syscall_args=syscall.arguments)
                 syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args
