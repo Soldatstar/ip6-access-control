@@ -157,7 +157,7 @@ def init_shared_list(socket):
     while True:
         _, response = socket.recv_multipart()
         response_data = json.loads(response.decode())
-
+        LOGGER.info("Received response: %s", response_data)
         if response_data['status'] == "success":
             for syscall in response_data['data']['allowed_syscalls']:
                 syscall_number = syscall[0]
@@ -171,6 +171,8 @@ def init_shared_list(socket):
                 combined_array = [syscall_number] + syscall_args
                 DENY_LIST.append(combined_array)
             LOGGER.info("Shared list initialized successfully.")
+            LOGGER.info("ALLOW_LIST: %s", ALLOW_LIST)
+            LOGGER.info("DENY_LIST: %s", DENY_LIST)
             break
         elif response_data['status'] == "error":
             LOGGER.info("Error initializing shared list: %s", response_data['data'])
@@ -190,8 +192,15 @@ def is_already_decided(syscall_nr, arguments):
     """
     for decision in chain(ALLOW_LIST, DENY_LIST):
         if decision[0] == syscall_nr:
-            if Counter(decision[1:]) == Counter(arguments):
-                return True
+            decision_args = decision[1:]
+            if len(decision_args) == len(arguments):
+                # Compare each argument, allowing for wildcards
+                match = all(
+                    d_arg == "*" or d_arg == a_arg
+                    for d_arg, a_arg in zip(decision_args, arguments)
+                )
+                if match:
+                    return True
     return False
 
 

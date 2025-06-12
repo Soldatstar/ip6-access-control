@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import hashlib
 import zmq
 from user_tool import user_tool_main
+from pathlib import Path
 
 
 def test_handle_requests_valid_req_decision(monkeypatch):
@@ -87,7 +88,7 @@ def test_handle_requests_invalid_message_format(monkeypatch):
 def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
     """
     Test handling a 'read_db' request when no policy exists.
-    This test ensures that the function sends an appropriate error response.
+    This test ensures that the function sends the default policy in the response.
     """
     # Given: A 'read_db' request with no corresponding policy file
     mock_socket = MagicMock()
@@ -101,13 +102,18 @@ def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
 
+    # Load the actual default policy from ../user_tool/default.json
+    default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
+    with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+        default_policy = json.load(default_file)
+
     # When: The handle_requests function is called
     user_tool_main.handle_requests()
 
-    # Then: An error response should be sent back
+    # Then: The default policy should be sent back
     expected_response = {
-        "status": "error",
-        "data": {"message": "No policy found"}
+        "status": "success",
+        "data": default_policy["rules"]
     }
     mock_socket.send_multipart.assert_called_once_with(
         [mock_identity, b'', json.dumps(expected_response).encode()]
@@ -140,13 +146,21 @@ def test_handle_requests_read_db_valid_policy(monkeypatch, tmp_path):
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
 
+    # Load the actual default policy from ../user_tool/default.json
+    default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
+    with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+        default_policy = json.load(default_file)
+
     # When: The handle_requests function is called
     user_tool_main.handle_requests()
 
-    # Then: The correct policy data should be sent back
+    # Then: The correct policy data should be sent back, including default rules
     expected_response = {
         "status": "success",
-        "data": {"allowed_syscalls": []}
+        "data": {
+            "allowed_syscalls": default_policy["rules"]["allowed_syscalls"],
+            "denied_syscalls": []
+        }
     }
     mock_socket.send_multipart.assert_called_once_with(
         [mock_identity, b'', json.dumps(expected_response).encode()]
