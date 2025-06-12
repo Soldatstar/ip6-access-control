@@ -22,6 +22,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from user_tool import policy_manager
 from user_tool import user_interaction
+from user_tool import group_selector
 from shared import conf_utils
 from user_tool.policy_manager import Policy
 
@@ -99,6 +100,9 @@ def handle_requests():
                 POLICIES_DIR, program_hash, "policy.json")
 
             response = None
+            # Read all group names from the groups file
+            all_groups = set(group_selector.get_groups_structure("user_tool/groups").keys())
+
             if os.path.exists(policy_file) and os.path.getsize(policy_file) > 0:
                 with open(policy_file, "r", encoding="UTF-8") as file:
                     try:
@@ -113,6 +117,21 @@ def handle_requests():
                             default_syscalls = default_data.get("rules", {}).get("allowed_syscalls", [])
                             rules["allowed_syscalls"] = default_syscalls + rules.get("allowed_syscalls", [])
                         rules["denied_syscalls"] = rules.get("denied_syscalls", [])
+                        # Determine blacklist
+                        allowed_groups = set(rules.get("allowed_groups", []))
+                        if not allowed_groups:
+                            # No allowed_groups: blacklist all groups
+                            blacklisted_groups = all_groups
+                        else:
+                            # Blacklist = all groups - allowed_groups
+                            blacklisted_groups = all_groups - allowed_groups
+
+                        # Expand to syscall IDs
+                        blacklisted_ids = []
+                        for group in blacklisted_groups:
+                            blacklisted_ids.extend(group_selector.get_syscalls_for_group(group))
+                        rules["blacklisted_ids"] = sorted(set(blacklisted_ids))
+
                         response = {
                             "status": "success",
                             "data": rules
@@ -132,8 +151,12 @@ def handle_requests():
                 with open(default_policy_path, "r", encoding="UTF-8") as default_file:
                     default_data = json.load(default_file)
                     rules = default_data.get("rules", {})
-                    # Ensure denied_syscalls is included, even if empty
-                    rules["denied_syscalls"] = rules.get("denied_syscalls", [])
+                    # Blacklist all groups if no policy
+                    blacklisted_groups = all_groups
+                    blacklisted_ids = []
+                    for group in blacklisted_groups:
+                        blacklisted_ids.extend(group_selector.get_syscalls_for_group(group))
+                    rules["blacklisted_ids"] = sorted(set(blacklisted_ids))
                     response = {
                         "status": "success",
                         "data": rules
@@ -206,6 +229,15 @@ def main(test_mode=False):
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
+    # group_selector.build_syscall_to_group_map("user_tool/groups")
+    # LOGGER.info("SYSCALL_TO_GROUP mapping: %s", group_selector.SYSCALL_TO_GROUP)
+    # LOGGER.info("Groups structure: %s", group_selector.get_groups_structure("user_tool/groups"))
+    # syscall_id = 132
+    # group = group_selector.get_group_for_syscall(syscall_id)
+    # LOGGER.info("Syscall %d belongs to group: %s", syscall_id, group)
+    # group_name = "FileTimestamp"
+    # ids = group_selector.get_syscalls_for_group(group_name)
+    # LOGGER.info("Syscall IDs for group %s: %s", group_name, ids)
 
     while True:
         LOGGER.info("User Tool Menu:")

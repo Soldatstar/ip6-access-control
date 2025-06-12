@@ -41,7 +41,7 @@ PROGRAM_ABSOLUTE_PATH = None
 MANAGER = Manager()
 ALLOW_LIST = MANAGER.list()
 DENY_LIST = MANAGER.list()
-
+SYSCALL_ID_SET = set()
 
 def init_seccomp(deny_list):
     """
@@ -170,9 +170,14 @@ def init_shared_list(socket):
                 syscall_args = syscall[1]
                 combined_array = [syscall_number] + syscall_args
                 DENY_LIST.append(combined_array)
+            rules = response_data['data']['blacklisted_ids']
+            for syscall_id in rules:
+                SYSCALL_ID_SET.add(syscall_id)
             LOGGER.info("Shared list initialized successfully.")
             LOGGER.info("ALLOW_LIST: %s", ALLOW_LIST)
             LOGGER.info("DENY_LIST: %s", DENY_LIST)
+            LOGGER.info("Dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
+
             break
         elif response_data['status'] == "error":
             LOGGER.info("Error initializing shared list: %s", response_data['data'])
@@ -263,22 +268,11 @@ def main():
             if syscall.result is None:
                 syscall_number = syscall.syscall
                 
-                ######
-
-                #TODO: implement proper blacklist behaviour. this set is for catching all "normal-files" operation
-
-                syscall_id_set = {
-                2, 76, 77, 83, 84, 85, 86, 87, 88, 90, 91, 92, 93, 94, 95,
-                132, 133, 188, 189, 190, 197, 198, 199, 235, 257, 258, 259,
-                260, 263, 265, 266, 268, 280
-                }
-                if syscall_number not in syscall_id_set:
+                if syscall_number not in SYSCALL_ID_SET:
                     LOGGER.info("skipping non blacklisted call: %s",syscall_number)
                     process.syscall()
                     continue
-
-
-                ######
+                LOGGER.info("Syscall number: %s", syscall_number)
                 syscall_args = prepare_arguments(syscall_args=syscall.arguments)
                 syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
                 combined_array = [syscall_number] + syscall_args

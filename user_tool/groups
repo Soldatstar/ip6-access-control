@@ -11,13 +11,19 @@
 # Arguments for file opening modes and flags
 a: read-flags (
     O_RDONLY
-    O_CLOEXEC
+)
+
+a: read-write-create-flags (
+    O_RDWR
+    O_CREAT
+)
+a: read-write-flags (
+    O_RDWR
 )
 
 a: write-flags (
     O_WRONLY
-    O_RDWR
-    O_CLOEXEC
+    O_CREAT
 )
 
 a: create-flags (
@@ -79,6 +85,8 @@ g: FileAccess {
     0 read(int fd, void buf[.count], size_t count)
     17 pread(int fd, void buf[.count], size_t count, off_t offset)
 
+
+
     p: Do you want to enable reading files in /etc? [
         pathname = etc-directories
         flags = read-flags
@@ -93,6 +101,26 @@ g: FileAccess {
         pathname = critical-files
         flags = read-flags
     ]
+
+    p: Do you want to allow the program to create new files or open existing ones for modification? [
+        flags = read-write-create-flags
+    ]
+
+    p: Do you want to allow the reading of files? [
+        flags = read-flags
+    ]    
+ 
+    p: Do you want to allow the editing of files? [
+        flags = read-write-flags
+    ]  
+
+    p: Do you want to allow the (over)writing of files? [
+        flags = write-flags
+    ]   
+
+    p: Do you want to allow the creation of files? [
+        flags = create-flags
+    ]   
 
     p: Do you want to enable reading if file descriptor is available? [
 
@@ -123,6 +151,7 @@ g: FileSystemLinks {
     266 symlinkat(const char *target, int newdirfd, const char *linkpath)
 
     p:FileSystemLinks Placeholder? [
+        flags = write-flags
 
     ]
 }

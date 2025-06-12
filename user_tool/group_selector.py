@@ -11,6 +11,8 @@ GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
 GROUPS_DEFAULT_QUESTION = {} 
+# Global mapping from syscall ID to group name
+SYSCALL_TO_GROUP = {}
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
@@ -137,8 +139,8 @@ def get_question(syscall_nr, argument):
                     LOGGER.info("Parameter '%s' has values: %s", parameter, parameter_values)
                     LOGGER.info("Checking against provided argument: %s", argument)
                     
-                    # If the length of the given argument is not 0 and all given arguments match the parameter set
-                    if len(argument) != 0 and set(argument).issubset(parameter_values):
+                    # If the rule has required values, check if the syscall's arguments contain all of them.
+                    if parameter_values and set(argument).issuperset(parameter_values):
                         LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
                         LOGGER.info("Returning parameter: %s", parameter)
                         return parameter
@@ -203,3 +205,58 @@ def argument_separator(argument_raw, argument_pretty):
                 argument_values.extend(flag_mode_values)
 
     return argument_values
+
+
+
+def build_syscall_to_group_map(groups_file):
+    """
+    Build a global mapping from syscall ID to group name.
+    """
+    global SYSCALL_TO_GROUP
+    group_map = get_groups_structure(groups_file)
+    SYSCALL_TO_GROUP = {}
+    for group, syscalls in group_map.items():
+        for syscall in syscalls:
+            SYSCALL_TO_GROUP[syscall] = group
+
+def get_group_for_syscall(syscall_id):
+    """
+    Return the group name for a given syscall ID, or None if not found.
+    """
+    return SYSCALL_TO_GROUP.get(syscall_id)
+
+def get_groups_structure(filename):
+    """
+    Parse the groups file and return a dict mapping group names to syscall IDs.
+    """
+    groups = {}
+    current_group = None
+    syscalls = []
+    with open(filename, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("g:"):
+                if current_group and syscalls:
+                    groups[current_group] = syscalls
+                current_group = line[2:].split("{")[0].strip()
+                syscalls = []
+            elif current_group and line and line[0].isdigit():
+                syscall_id = int(line.split()[0])
+                syscalls.append(syscall_id)
+            elif line.startswith("}"):
+                if current_group and syscalls:
+                    groups[current_group] = syscalls
+                current_group = None
+                syscalls = []
+        # Add last group if file doesn't end with }
+        if current_group and syscalls:
+            groups[current_group] = syscalls
+    return groups
+
+
+def get_syscalls_for_group(group_name, groups_file="user_tool/groups"):
+    """
+    Return a list of syscall IDs for a given group name.
+    """
+    groups = get_groups_structure(groups_file)
+    return groups.get(group_name, [])
