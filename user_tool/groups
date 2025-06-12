@@ -3,6 +3,7 @@
 # - Parameters are allowed only within groups and are specified with "p:" and "[]" brackets.
 # - Each group starts with the system call number on each line and are specified with "g:" and "{}" brackets.
 # - Parameters are asked sequentially, they need to end with "?".
+# - each grouping can use a default questions for when no match occurs. specified with "d:"
 # Once all arguments for a system call hit, the question is thrown.
 # - If a parameter is not explicitly provided, all values for the parameter are implicitly assumed.
 # - Values for parameter must be declared as arguments and assigned using "="
@@ -99,6 +100,7 @@ g: FileAccess {
 }
 
 g: FileOpenCreate {
+    d: Do you want to allow file opening or creation
     2 open(const char *pathname, int flags, ... /* mode_t mode */)
     85 creat(const char *pathname, mode_t mode)
 
@@ -125,15 +127,24 @@ g: FileSystemLinks {
     ]
 }
 
-g: FileSystemNodeManagement {
-    d: Do you allow the creation or removal of directories and special files
+g: FileSystemNodeManagementCreate {
+    d: Do you allow the creation of directories and special files
     83 mkdir(const char *pathname, mode_t mode)
     84 rmdir(const char *pathname)
     133 mknod(const char *pathname, mode_t mode, dev_t dev)
     258 mkdirat(int dirfd, const char *pathname, mode_t mode)
     259 mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev)
 
-    p:FileSystemNodeManagement Placeholder? [
+    p:Do you allow the creation of a directory? [
+
+    ]
+}
+
+g: FileSystemNodeManagementDelete {
+    d: Do you allow the removal of a directory 
+    84 rmdir(const char *pathname)
+
+    p:Do you allow the removal of a directory? [
 
     ]
 }

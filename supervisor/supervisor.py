@@ -50,7 +50,7 @@ def init_seccomp(deny_list):
     Args:
         deny_list (list): A list of denied syscalls and their arguments.
     """
-    f = SyscallFilter(defaction=ALLOW)
+    sys_filter = SyscallFilter(defaction=ALLOW)
 
     for deny_decision in deny_list:
         syscall_nr = deny_decision[0]
@@ -58,13 +58,13 @@ def init_seccomp(deny_list):
             try:
                 # TODO: Look at seccomp how path to files are handled
                 if not isinstance(deny_decision[1:][i], str):
-                    f.add_rule(TRAP, syscall_nr, Arg(
+                    sys_filter.add_rule(TRAP, syscall_nr, Arg(
                         i, EQ, deny_decision[1:][i]))
             except TypeError as e:
                 LOGGER.info("TypeError: %s - For syscall_nr: %s, Argument: %s",
                             e, syscall_nr, deny_decision[1:][i])
 
-    f.load()
+    sys_filter.load()
 
 
 def child_prozess(deny_list, argv):

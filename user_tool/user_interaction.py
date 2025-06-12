@@ -59,8 +59,8 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
         prompt = (
             f"{question}?\n"
             f"            Program: {program_name}\n"
-            f"            Hash: {program_hash}\n"
-            #f"            Parameter: {parameter_formated}\n"
+            #f"            Hash: {program_hash}\n"
+            f"            Parameter: {parameter_formated}\n"
             "             ( (y)es / (n)o / (o)ne ): "
         )
         mapping = {
@@ -92,7 +92,7 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
 
     text_width = max(len(program_name), len(program_hash)) * 7
     width = max(400, text_width + 50)
-    height = 150 + 50
+    height = 250 + 50
 
     root.geometry(f"{width}x{height}")
 
@@ -101,8 +101,8 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
         text=(
             f"{question}?\n"
             f"Program: {program_name}\n"
-            f"Hash: {program_hash}\n"
-            #f"Parameter: {parameter_formated}"
+            #f"Hash: {program_hash}\n"
+            f"Parameter: {parameter_formated}"
         ),
         wraplength=350
     )
