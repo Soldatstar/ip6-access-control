@@ -196,6 +196,10 @@ def handle_requests():
                 group = group_selector.get_group_for_syscall(syscall_nr)
                 policy_manager.save_decision(policy, allowed_group=group)
                 allowed_ids = group_selector.get_syscalls_for_group(group)
+                if group is "FileAccess":
+                    # TODO: don't remove specific groups from the blacklist
+                    allowed_ids = [];
+
                 success_response = {
                     "status": "success",
                     "data": {
