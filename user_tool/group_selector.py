@@ -208,24 +208,7 @@ def argument_separator(argument_raw, argument_pretty):
 
 
 
-def build_syscall_to_group_map(groups_file):
-    """
-    Build a global mapping from syscall ID to group name.
-    """
-    global SYSCALL_TO_GROUP
-    group_map = get_groups_structure(groups_file)
-    SYSCALL_TO_GROUP = {}
-    for group, syscalls in group_map.items():
-        for syscall in syscalls:
-            SYSCALL_TO_GROUP[syscall] = group
-
-def get_group_for_syscall(syscall_id):
-    """
-    Return the group name for a given syscall ID, or None if not found.
-    """
-    return SYSCALL_TO_GROUP.get(syscall_id)
-
-def get_groups_structure(filename):
+def parse_groups_file(filename: str) -> dict:
     """
     Parse the groups file and return a dict mapping group names to syscall IDs.
     """
@@ -248,15 +231,36 @@ def get_groups_structure(filename):
                     groups[current_group] = syscalls
                 current_group = None
                 syscalls = []
-        # Add last group if file doesn't end with }
         if current_group and syscalls:
             groups[current_group] = syscalls
     return groups
 
+def build_syscall_to_group_map(groups_file: str):
+    """
+    Build a global mapping from syscall ID to group name.
+    """
+    global SYSCALL_TO_GROUP
+    SYSCALL_TO_GROUP.clear()
+    group_map = parse_groups_file(groups_file)
+    for group, syscalls in group_map.items():
+        for syscall in syscalls:
+            SYSCALL_TO_GROUP[syscall] = group
 
-def get_syscalls_for_group(group_name, groups_file="user_tool/groups"):
+def get_group_for_syscall(syscall_id: int):
+    """
+    Return the group name for a given syscall ID, or None if not found.
+    """
+    return SYSCALL_TO_GROUP.get(syscall_id)
+
+def get_groups_structure(filename: str) -> dict:
+    """
+    Return a dict mapping group names to syscall IDs.
+    """
+    return parse_groups_file(filename)
+
+def get_syscalls_for_group(group_name: str, groups_file: str = "user_tool/groups"):
     """
     Return a list of syscall IDs for a given group name.
     """
-    groups = get_groups_structure(groups_file)
+    groups = parse_groups_file(groups_file)
     return groups.get(group_name, [])

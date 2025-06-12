@@ -122,8 +122,8 @@ def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_fo
     while True:
         _, response = socket.recv_multipart()
         response_data = json.loads(response.decode())
-
-        return response_data['data']['decision']
+        LOGGER.info("Received response: %s", response_data)
+        return response_data['data']
 
 
 def set_program_path(relative_path):
@@ -288,12 +288,15 @@ def main():
                         socket=socket
                     )
 
-                    if decision == "ALLOW":
-                        LOGGER.info("Decision: ALLOW Syscall: %s",
-                                    syscall.format())
+                    if decision["decision"] == "ALLOW":
+                        LOGGER.info("Decision: ALLOW Syscall: %s", syscall.format())
+                        size_before = len(SYSCALL_ID_SET)
                         ALLOW_LIST.append(combined_array)
-
-                    if decision == "DENY":
+                        for sid in decision.get("allowed_ids", []):
+                            SYSCALL_ID_SET.discard(sid)
+                        LOGGER.info("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
+                        LOGGER.info("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
+                    if decision["decision"] == "DENY":
                         LOGGER.info("Decision: DENY Syscall: %s",
                                     syscall.format())
                         DENY_LIST.append(combined_array)

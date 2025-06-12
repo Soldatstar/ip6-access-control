@@ -34,7 +34,7 @@ def test_ask_for_permission_zmq():
 
     # When: The function is called
     with patch("supervisor.supervisor.LOGGER") as mock_logger:
-        decision = ask_for_permission_zmq(
+        result = ask_for_permission_zmq(
             syscall_name=syscall_name,
             syscall_nr=syscall_nr,
             arguments_raw=arguments_raw,
@@ -57,11 +57,14 @@ def test_ask_for_permission_zmq():
         [b'', json.dumps(expected_message).encode()])
 
     # And: The decision should be correctly returned
-    assert decision == "ALLOW"
+    assert result["decision"] == "ALLOW"
 
     # And: The logger should log the request
-    mock_logger.info.assert_called_with(
-        "Asking for permission for syscall: %s", syscall_name)
+    log_calls = [call for call in mock_logger.info.call_args_list]
+    assert any(
+        call[0][0] == "Asking for permission for syscall: %s" and call[0][1] == syscall_name
+        for call in log_calls
+    )
 
 
 def test_is_already_decided_true():
@@ -128,7 +131,8 @@ def test_init_shared_list_success(mocker):
         "status": "success",
         "data": {
             "allowed_syscalls": [[2, ["arg1", "arg2"]]],
-            "denied_syscalls": [[3, ["arg3"]]]
+            "denied_syscalls": [[3, ["arg3"]]],
+            "blacklisted_ids": [2, 3]
         }
     }
     mock_socket.recv_multipart.side_effect = [
@@ -138,13 +142,17 @@ def test_init_shared_list_success(mocker):
     # Mock ALLOW_LIST and DENY_LIST
     mock_allow_list = mocker.patch("supervisor.supervisor.ALLOW_LIST", [])
     mock_deny_list = mocker.patch("supervisor.supervisor.DENY_LIST", [])
+    mock_syscall_id_set = mocker.patch("supervisor.supervisor.SYSCALL_ID_SET", set())
 
     # When: The init_shared_list function is called
-    init_shared_list(socket=mock_socket)
+    from supervisor import supervisor
+    supervisor.init_shared_list(socket=mock_socket)
 
     # Then: ALLOW_LIST and DENY_LIST should be populated correctly
+    # The logic appends [nr] + args, so flatten the lists
     assert list(mock_allow_list) == [[2, "arg1", "arg2"]]
     assert list(mock_deny_list) == [[3, "arg3"]]
+    assert mock_syscall_id_set == {2, 3}
 
     # And: The correct message should be sent
     expected_message = {

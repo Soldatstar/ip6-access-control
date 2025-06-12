@@ -32,7 +32,7 @@ class Policy:
         self.parameter = parameter
 
 
-def save_decision(policy: Policy):
+def save_decision(policy: Policy, allowed_group=None):
     """
     Save the decision made by the user regarding a syscall policy.
 
@@ -71,7 +71,8 @@ def save_decision(policy: Policy):
             },
             "rules": {
                 "allowed_syscalls": [],
-                "denied_syscalls": []
+                "denied_syscalls": [],
+                "allowed_groups": []
             }
         }
 
@@ -80,6 +81,9 @@ def save_decision(policy: Policy):
     if policy.decision == "ALLOW":
         if syscall_entry not in data["rules"]["allowed_syscalls"]:
             data["rules"]["allowed_syscalls"].append(syscall_entry)
+        # Add group to allowed_groups if not already present
+        if allowed_group and allowed_group not in data["rules"]["allowed_groups"]:
+            data["rules"]["allowed_groups"].append(allowed_group)
     else:
         if syscall_entry not in data["rules"]["denied_syscalls"]:
             data["rules"]["denied_syscalls"].append(syscall_entry)

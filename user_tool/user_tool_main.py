@@ -193,7 +193,19 @@ def handle_requests():
                 policy = Policy(
                     program_path, program_hash, syscall_nr, "ALLOW", "placeholder_user", parameter
                 )
-                policy_manager.save_decision(policy)
+                group = group_selector.get_group_for_syscall(syscall_nr)
+                policy_manager.save_decision(policy, allowed_group=group)
+                allowed_ids = group_selector.get_syscalls_for_group(group)
+                success_response = {
+                    "status": "success",
+                    "data": {
+                        "decision": response,
+                        "allowed_ids": allowed_ids
+                    }
+                }
+                socket.send_multipart(
+                    [identity, b'', json.dumps(success_response).encode()])
+                continue
             case "DENY":
                 LOGGER.info("User denied the request for %s (hash: %s)",
                             program_name, program_hash)
@@ -229,7 +241,7 @@ def main(test_mode=False):
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
-    # group_selector.build_syscall_to_group_map("user_tool/groups")
+    group_selector.build_syscall_to_group_map("user_tool/groups")
     # LOGGER.info("SYSCALL_TO_GROUP mapping: %s", group_selector.SYSCALL_TO_GROUP)
     # LOGGER.info("Groups structure: %s", group_selector.get_groups_structure("user_tool/groups"))
     # syscall_id = 132
