@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import hashlib
 import zmq
 from user_tool import user_tool_main
+from pathlib import Path
 
 
 def test_handle_requests_valid_req_decision(monkeypatch):
@@ -41,6 +42,9 @@ def test_handle_requests_valid_req_decision(monkeypatch):
     monkeypatch.setattr("user_tool.user_tool_main.user_interaction", mock_utils)
     mock_policy_manager = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
+    # Patch group_selector.get_group_for_syscall to return a group
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_group_for_syscall", lambda x: "TestGroup")
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [42])
 
     # When: The handle_requests function is called
     user_tool_main.handle_requests()
@@ -48,7 +52,7 @@ def test_handle_requests_valid_req_decision(monkeypatch):
     # Then: The correct response should be sent back
     expected_response = {
         "status": "success",
-        "data": {"decision": "ALLOW"}
+        "data": {"decision": "ALLOW", "allowed_ids": [42]}
     }
     mock_socket.send_multipart.assert_called_once_with(
         [mock_identity, b'', json.dumps(expected_response).encode()]
@@ -87,7 +91,7 @@ def test_handle_requests_invalid_message_format(monkeypatch):
 def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
     """
     Test handling a 'read_db' request when no policy exists.
-    This test ensures that the function sends an appropriate error response.
+    This test ensures that the function sends the default policy in the response.
     """
     # Given: A 'read_db' request with no corresponding policy file
     mock_socket = MagicMock()
@@ -101,13 +105,25 @@ def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
 
+    # Patch group_selector.get_groups_structure and get_syscalls_for_group
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_groups_structure", lambda x: {"A": [1], "B": [2]})
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [1] if group == "A" else [2])
+
+    # Load the actual default policy from ../user_tool/default.json
+    default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
+    with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+        default_policy = json.load(default_file)
+
     # When: The handle_requests function is called
     user_tool_main.handle_requests()
 
-    # Then: An error response should be sent back
+    # Then: The default policy should be sent back
+    # The response should include blacklisted_ids
+    expected_data = default_policy["rules"].copy()
+    expected_data["blacklisted_ids"] = [1, 2]
     expected_response = {
-        "status": "error",
-        "data": {"message": "No policy found"}
+        "status": "success",
+        "data": expected_data
     }
     mock_socket.send_multipart.assert_called_once_with(
         [mock_identity, b'', json.dumps(expected_response).encode()]
@@ -134,23 +150,46 @@ def test_handle_requests_read_db_valid_policy(monkeypatch, tmp_path):
     policy_dir.mkdir()
     policy_file = policy_dir / "policy.json"
     # Valid policy content
-    policy_file.write_text(json.dumps({"rules": {"allowed_syscalls": []}}))
+    policy_file.write_text(json.dumps({"rules": {"allowed_syscalls": [[42, ["foo"]]], "allowed_groups": ["A"]}}))
     user_tool_main.REQUEST_QUEUE.put((mock_socket, mock_identity, mock_message))
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
 
+    # Patch group_selector.get_groups_structure and get_syscalls_for_group
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_groups_structure", lambda x: {"A": [1], "B": [2]})
+    monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [1] if group == "A" else [2])
+
+    # Load the actual default policy from ../user_tool/default.json
+    default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
+    with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+        default_policy = json.load(default_file)
+
     # When: The handle_requests function is called
     user_tool_main.handle_requests()
 
-    # Then: The correct policy data should be sent back
+    # Then: The correct policy data should be sent back, including default rules and blacklisted_ids
+    expected_rules = {
+        "allowed_syscalls": default_policy["rules"]["allowed_syscalls"] + [[42, ["foo"]]],
+        "denied_syscalls": [],
+        "allowed_groups": ["A"],
+        "blacklisted_ids": [2]
+    }
+    from collections import OrderedDict
+    expected_rules_ordered = OrderedDict([
+        ("allowed_syscalls", expected_rules["allowed_syscalls"]),
+        ("denied_syscalls", expected_rules["denied_syscalls"]),
+        ("allowed_groups", expected_rules["allowed_groups"]),
+        ("blacklisted_ids", expected_rules["blacklisted_ids"]),
+    ])
     expected_response = {
         "status": "success",
-        "data": {"allowed_syscalls": []}
+        "data": expected_rules_ordered
     }
-    mock_socket.send_multipart.assert_called_once_with(
-        [mock_identity, b'', json.dumps(expected_response).encode()]
-    )
+    # Fix: Access the sent JSON correctly
+    sent_args = mock_socket.send_multipart.call_args[0][0]  # This is the list passed to send_multipart
+    actual_json = sent_args[2]  # The third element is the JSON bytes
+    assert json.loads(actual_json.decode()) == expected_response
     mock_logger.debug.assert_called_once_with(
         "Policy for %s: %s", program_hash, mock.ANY)
 

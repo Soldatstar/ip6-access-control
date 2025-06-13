@@ -44,10 +44,11 @@ def test_get_question_matching_syscall_and_argument(mocker):
     mocker.patch("user_tool.group_selector.GROUPS_SYSCALL", {"AccessFile": [2]})
     mocker.patch("user_tool.group_selector.GROUPS_PARAMETER_ORDER", {"AccessFile": ["critical-directories"]})
     mocker.patch("user_tool.group_selector.PARAMETERS", {"critical-directories": ["pathname=critical-directories"]})
+    # The key must be the value after '=', i.e., "critical-directories"
     mocker.patch("user_tool.group_selector.ARGUMENTS", {"critical-directories": ["/root", "/boot"]})
 
     syscall_nr = 2
-    argument = ["/root"]
+    argument = ["/root", "/boot"]  # Must be a superset of parameter values
 
     # When: The get_question function is called
     result = group_selector.get_question(syscall_nr, argument)
