@@ -20,6 +20,7 @@ help:
 	@echo "  make delete: Löscht das virtuelle Environment."
 	@echo "  make run: Aktiviert das virtuelle Environment und führt supervisor.py aus (Linux)."
 	@echo "  make ut: Aktiviert das virtuelle Environment und führt user_tool.py aus (Linux)."
+	@echo "  make utv: Aktiviert das virtuelle Environment und führt user_tool.py im Debug-Modus aus (Linux)."
 	@echo "  make test: Aktiviert das virtuelle Environment und führt die Tests aus (Linux)."
 	@echo "  make pylint: Aktiviert das virtuelle Environment und führt pylint aus (Linux)."
 	@echo "  make build: Aktiviert das virtuelle Environment und erstellt das Projekt (Linux)."
@@ -60,6 +61,9 @@ run2:
 ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py
 
+utv:
+	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py --debug
+
 test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report 
@@ -68,4 +72,8 @@ pylint:
 	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py') 
 build:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m build
+runv: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py --debug $(DEMOPROGRAM)
+run2v:
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py --debug $(DEMONORMALFILES)	
 .PHONY: help create delete run

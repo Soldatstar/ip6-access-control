@@ -16,6 +16,8 @@ import hashlib
 import sys
 from pathlib import Path
 import zmq
+import logging
+import argparse
 
 # Add the parent directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -176,7 +178,7 @@ def handle_requests():
             continue
         LOGGER.info("Handling request for %s (hash: %s)",
                     program_name, program_hash)
-        LOGGER.info("Syscall: %s (ID: %s parameter: %s)",
+        LOGGER.debug("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
         response = user_interaction.ask_permission(
             syscall_nr, program_name, program_hash, parameter_formated, parameter)
@@ -196,15 +198,35 @@ def handle_requests():
                 group = group_selector.get_group_for_syscall(syscall_nr)
                 policy_manager.save_decision(policy, allowed_group=group)
                 allowed_ids = group_selector.get_syscalls_for_group(group)
-                if group == "FileAccess":
-                    # TODO: don't remove specific groups from the blacklist
-                    allowed_ids = [];
+                ######
+                # TODO: Currently all Syscalls in a group will be removed from the blacklist except FileAccess
+                #if group == "FileAccess": 
+                #    allowed_ids = []
+                ######
 
                 success_response = {
                     "status": "success",
                     "data": {
                         "decision": response,
                         "allowed_ids": allowed_ids
+                    }
+                }
+                socket.send_multipart(
+                    [identity, b'', json.dumps(success_response).encode()])
+                continue
+            case "ALLOW_THIS":
+                LOGGER.info("User allowed only this syscall/parameter for %s (hash: %s)",
+                            program_name, program_hash)
+                policy = Policy(
+                    program_path, program_hash, syscall_nr, "ALLOW", "placeholder_user", parameter
+                )
+                policy_manager.save_decision(policy)
+                # Only allow this syscall with this parameter
+                success_response = {
+                    "status": "success",
+                    "data": {
+                        "decision": response,
+                        "allowed_ids": []
                     }
                 }
                 socket.send_multipart(
@@ -232,7 +254,7 @@ def handle_requests():
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
 
 
-def main(test_mode=False):
+def main(test_mode=False, debug=False):
     """
     Main entry point for the User Tool.
 
@@ -241,7 +263,11 @@ def main(test_mode=False):
 
     Args:
         test_mode (bool): If True, the function will exit after one iteration of the loop.
+        debug (bool): If True, sets logging to DEBUG level.
     """
+    if debug:
+        LOGGER.setLevel("DEBUG")
+        LOGGER.info("Debug mode is enabled. Logging level set to DEBUG.")
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
@@ -294,4 +320,13 @@ def main(test_mode=False):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="User Tool Main")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--test", action="store_true", help="Enable test mode")
+    args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=log_level)
+    LOGGER.setLevel(log_level)
+
+    main(test_mode=args.test, debug=args.debug)

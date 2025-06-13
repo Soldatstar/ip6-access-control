@@ -61,10 +61,11 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
             f"            Program: {program_name}\n"
             #f"            Hash: {program_hash}\n"
             f"            Parameter: {parameter_formated}\n"
-            "             ( (y)es / (n)o / (o)ne ): "
+            "             ( (y)es / (t)his / (n)o / (o)ne ): "
         )
         mapping = {
             'yes': 'ALLOW',   'y': 'ALLOW',
+            'this': 'ALLOW_THIS', 't': 'ALLOW_THIS',
             'no':  'DENY',    'n': 'DENY',
             'one': 'ONE_TIME','o': 'ONE_TIME',
         }
@@ -91,8 +92,8 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
     root.title("Permission Request")
 
     text_width = max(len(program_name), len(program_hash)) * 7
-    width = max(400, text_width + 50)
-    height = 250 + 50
+    width = max(400, text_width + 150)
+    height = 150 + 50
 
     root.geometry(f"{width}x{height}")
 
@@ -110,8 +111,13 @@ def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, p
 
     btn_frame = tk.Frame(root)
     btn_frame.pack(pady=10)
-    for txt, val in [("Allow", "ALLOW"), ("Deny", "DENY"), ("One Time", "ONE_TIME")]:
-        tk.Button(btn_frame, text=txt, width=10,
+    for txt, val in [
+        ("Allow (Group)", "ALLOW"),
+        ("Allow Only This", "ALLOW_THIS"),
+        ("Deny", "DENY"),
+        ("One Time", "ONE_TIME")
+    ]:
+        tk.Button(btn_frame, text=txt, width=15,
                   command=lambda v=val: set_decision(v)).pack(side=tk.LEFT, padx=5)
 
     threading.Thread(target=ask_cli, daemon=True).start()

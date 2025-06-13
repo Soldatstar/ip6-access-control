@@ -102,7 +102,7 @@ def parse_file(filename):
         flush_parameter(parameter_name, parameter_values, group_name)
         flush_group(group_name, syscall_values)
 
-        LOGGER.info("Group para. order: %s", GROUPS_PARAMETER_ORDER)
+        LOGGER.debug("Group para. order: %s", GROUPS_PARAMETER_ORDER)
     except (FileNotFoundError, IOError, ValueError) as e:
         LOGGER.error("Error parsing file %s: %s", filename, e)
 
@@ -119,10 +119,10 @@ def get_question(syscall_nr, argument):
         str: The parameter question if found, otherwise -1.
     """
     for groups in GROUPS_ORDER:
-        LOGGER.info("Processing group: %s", groups)
+        LOGGER.debug("Processing group: %s", groups)
         
         for syscall in GROUPS_SYSCALL[groups]:
-            LOGGER.info("Checking syscall: %s against target: %s", syscall, syscall_nr)
+            LOGGER.debug("Checking syscall: %s against target: %s", syscall, syscall_nr)
             
             if syscall == syscall_nr:
                 LOGGER.info("Match found! Syscall %s matches target %s", syscall, syscall_nr)
@@ -131,11 +131,11 @@ def get_question(syscall_nr, argument):
                 param_order = GROUPS_PARAMETER_ORDER.get(groups, [])
                 if not param_order:
                     default_question = GROUPS_DEFAULT_QUESTION.get(groups, -1)
-                    LOGGER.info("No parameters for group '%s', returning default: %s", groups, default_question)
+                    LOGGER.debug("No parameters for group '%s', returning default: %s", groups, default_question)
                     return default_question
 
                 for parameter in param_order:
-                    LOGGER.info("Processing parameter: %s", parameter)
+                    LOGGER.debug("Processing parameter: %s", parameter)
                     parameter_values = set()
                     for arg in PARAMETERS[parameter]:
                         LOGGER.debug("Processing argument: %s", arg)
@@ -145,8 +145,8 @@ def get_question(syscall_nr, argument):
                         for a in ARGUMENTS[value]:
                             parameter_values.add(a)
                             LOGGER.debug("Added to parameter_values: %s", a)
-                    LOGGER.info("Parameter '%s' has values: %s", parameter, parameter_values)
-                    LOGGER.info("Checking against provided argument: %s", argument)
+                    LOGGER.debug("Parameter '%s' has values: %s", parameter, parameter_values)
+                    LOGGER.debug("Checking against provided argument: %s", argument)
                     if parameter_values and set(argument).issuperset(parameter_values):
                         LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
                         LOGGER.info("Returning parameter: %s", parameter)

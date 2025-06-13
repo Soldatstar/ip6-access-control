@@ -44,7 +44,7 @@ def save_decision(policy: Policy, allowed_group=None):
     """
     process_dir = os.path.join(POLICIES_DIR, policy.hash_value)
     os.makedirs(process_dir, exist_ok=True)
-    LOGGER.info(
+    LOGGER.debug(
         "Saving decision for %s (hash: %s) in %s", policy.name, policy.hash_value, process_dir)
     policy_file = os.path.join(process_dir, "policy.json")
 

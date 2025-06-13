@@ -15,6 +15,7 @@ from errno import EPERM
 from multiprocessing import Manager, Process
 from itertools import chain
 from collections import Counter
+import argparse
 
 from ptrace.debugger import (
     PtraceDebugger, ProcessExit, NewProcessEvent, ProcessSignal)
@@ -34,7 +35,7 @@ POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories("supervisor.log", 
 # Configure logging
 log_file_path = LOGS_DIR / "supervisor.log"
 LOGGER = logging_config.configure_logging(log_file_path, "Supervisor")
-# TODO: improve logging, add various log levels
+LOGGER.propagate = False  # Prevent double logging
 
 PROGRAM_RELATIVE_PATH = None
 PROGRAM_ABSOLUTE_PATH = None
@@ -61,8 +62,8 @@ def init_seccomp(deny_list):
                     sys_filter.add_rule(TRAP, syscall_nr, Arg(
                         i, EQ, deny_decision[1:][i]))
             except TypeError as e:
-                LOGGER.info("TypeError: %s - For syscall_nr: %s, Argument: %s",
-                            e, syscall_nr, deny_decision[1:][i])
+                LOGGER.warning("TypeError: %s - For syscall_nr: %s, Argument: %s",
+                               e, syscall_nr, deny_decision[1:][i])
 
     sys_filter.load()
 
@@ -122,7 +123,7 @@ def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_fo
     while True:
         _, response = socket.recv_multipart()
         response_data = json.loads(response.decode())
-        LOGGER.info("Received response: %s", response_data)
+        LOGGER.debug("Received response: %s", response_data)
         return response_data['data']
 
 
@@ -157,7 +158,7 @@ def init_shared_list(socket):
     while True:
         _, response = socket.recv_multipart()
         response_data = json.loads(response.decode())
-        LOGGER.info("Received response: %s", response_data)
+        LOGGER.debug("Received response: %s", response_data)
         if response_data['status'] == "success":
             for syscall in response_data['data']['allowed_syscalls']:
                 syscall_number = syscall[0]
@@ -174,13 +175,13 @@ def init_shared_list(socket):
             for syscall_id in rules:
                 SYSCALL_ID_SET.add(syscall_id)
             LOGGER.info("Shared list initialized successfully.")
-            LOGGER.info("ALLOW_LIST: %s", ALLOW_LIST)
-            LOGGER.info("DENY_LIST: %s", DENY_LIST)
-            LOGGER.info("Dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
+            LOGGER.debug("ALLOW_LIST: %s", ALLOW_LIST)
+            LOGGER.debug("DENY_LIST: %s", DENY_LIST)
+            LOGGER.debug("Dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
 
             break
         elif response_data['status'] == "error":
-            LOGGER.info("Error initializing shared list: %s", response_data['data'])
+            LOGGER.error("Error initializing shared list: %s", response_data['data'])
             break
 
 
@@ -242,7 +243,7 @@ def main():
     """
     if len(argv) < 2:
         print("Nutzung: %s program" % argv[0], file=stderr)
-        LOGGER.info("Nutzung: %s program", argv[0])
+        LOGGER.error("Nutzung: %s program", argv[0])
         exit(1)
     LOGGER.info("Starting supervisor for %s", argv[1])
     set_program_path(relative_path=argv[1])
@@ -267,9 +268,9 @@ def main():
 
             if syscall.result is None:
                 syscall_number = syscall.syscall
-                
+
                 if syscall_number not in SYSCALL_ID_SET:
-                    LOGGER.info("skipping non blacklisted call: %s",syscall_number)
+                    LOGGER.debug("Skipping non blacklisted call: %s", syscall_number)
                     process.syscall()
                     continue
                 LOGGER.info("Syscall number: %s", syscall_number)
@@ -294,25 +295,22 @@ def main():
                         ALLOW_LIST.append(combined_array)
                         for sid in decision.get("allowed_ids", []):
                             SYSCALL_ID_SET.discard(sid)
-                        LOGGER.info("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
-                        LOGGER.info("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
+                        LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
+                        LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
                     if decision["decision"] == "DENY":
-                        LOGGER.info("Decision: DENY Syscall: %s",
-                                    syscall.format())
+                        LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
                         DENY_LIST.append(combined_array)
                         process.setreg('orig_rax', -EPERM)
                         process.syscall()
                         debugger.waitSyscall()
                         process.setreg('rax', -EPERM)
                 else:
-                    LOGGER.info("Decision for syscall: %s was already decided", 
-                            syscall.format())
+                    LOGGER.debug("Decision for syscall: %s was already decided", syscall.format())
 
             process.syscall()
 
         except ProcessSignal as event:
-            LOGGER.info("***SIGNAL***: %s", 
-                            event.name)
+            LOGGER.info("***SIGNAL***: %s", event.name)
             process.syscall()
             continue
 
@@ -338,4 +336,16 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Supervisor Main")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    args, unknown = parser.parse_known_args()
+
+    import logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    LOGGER.setLevel(log_level)
+    if args.debug:
+        LOGGER.info("Debug mode is enabled. Logging level set to DEBUG.")
+
+    # Pass through unknown args (e.g., program to supervise)
+    sys.argv = [sys.argv[0]] + unknown
     main()
