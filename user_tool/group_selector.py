@@ -21,80 +21,88 @@ LOGGER = logging.getLogger("User-Tool")
 def parse_file(filename):
     """
     Parse a configuration file to extract syscall groups, parameters, and arguments.
-
-    Args:
-        filename (str): Path to the configuration file.
     """
-    argument_name = None
-    argument_values = []
-    group_name = None
-    syscall_values = []
-    parameter_name = None
-    parameter_values = []
+    def flush_argument(arg_name, arg_values):
+        if arg_name and arg_values and arg_name not in ARGUMENTS:
+            ARGUMENTS[arg_name] = arg_values[:]
+
+    def flush_parameter(param_name, param_values, group_name):
+        if param_name and group_name:
+            if param_name not in PARAMETERS:
+                PARAMETERS[param_name] = param_values[:]
+                if group_name not in GROUPS_PARAMETER_ORDER:
+                    GROUPS_PARAMETER_ORDER[group_name] = []
+                GROUPS_PARAMETER_ORDER[group_name].append(param_name)
+
+    def flush_group(group_name, syscalls):
+        if group_name and syscalls and group_name not in GROUPS_SYSCALL:
+            GROUPS_SYSCALL[group_name] = syscalls[:]
+            GROUPS_ORDER.append(group_name)
+
+    argument_name, argument_values = None, []
+    parameter_name, parameter_values = None, []
+    group_name, syscall_values = None, []
+
     try:
         with open(filename, 'r', encoding="UTF-8") as file:
-            LOGGER.info("Parsing groups file: %s", filename)
             for line in file:
-                # Remove leading/trailing whitespace
                 line = line.strip()
-
-                # Skip empty lines
                 if not line:
                     continue
 
-                # Extract argument name
-
-                if group_name and line.startswith("d:"):
-                    default_question = line[2:].strip()
-                    GROUPS_DEFAULT_QUESTION[group_name] = default_question
-                    continue  # Skip further processing for this line
+                # Argument block
                 if line.startswith("a:"):
+                    flush_argument(argument_name, argument_values)
                     argument_name = line[2:].strip().split()[0]
-                # Store argument values
-                elif argument_name and line.startswith(")"):
-                    if argument_name not in ARGUMENTS:
-                        ARGUMENTS[argument_name] = argument_values
-                    argument_name = None
                     argument_values = []
-                # Add line to argument values list
+                    continue
+                elif argument_name and line.startswith(")"):
+                    flush_argument(argument_name, argument_values)
+                    argument_name, argument_values = None, []
+                    continue
                 elif argument_name:
                     argument_values.append(line)
+                    continue
 
-                match_nr = re.match(r'(\d+)', line)
-                # Extract group name
+                # Group block
                 if line.startswith("g:"):
+                    flush_group(group_name, syscall_values)
                     group_name = line[2:].strip().split()[0]
-                # Store system call values
-                elif group_name and line.startswith("}"):
-                    if group_name not in GROUPS_SYSCALL:
-                        GROUPS_SYSCALL[group_name] = syscall_values
-                        GROUPS_ORDER.append(group_name)
-                    group_name = None
                     syscall_values = []
-                # Add system call number to the list
-                elif group_name and match_nr:
-                    number = int(match_nr.group(1))
-                    syscall_values.append(number)
+                    continue
+                elif group_name and line.startswith("}"):
+                    flush_group(group_name, syscall_values)
+                    group_name, syscall_values = None, []
+                    continue
+                elif group_name and line and line[0].isdigit():
+                    syscall_values.append(int(line.split()[0]))
+                    continue
 
-                # Extract parameter name
+                # Default question for group
+                if group_name and line.startswith("d:"):
+                    GROUPS_DEFAULT_QUESTION[group_name] = line[2:].strip()
+                    continue
+
+                # Parameter block
                 if line.startswith("p:"):
-                    line = line.split('?')[0]
-                    parameter_name = line[2:].strip()
-                # Initialize parameter order list for the group
-                elif parameter_name and group_name and line.startswith("]"):
-                    LOGGER.info("initializing group: %s",group_name)
-                    if parameter_name not in PARAMETERS:
-                        if group_name not in GROUPS_PARAMETER_ORDER:
-                            GROUPS_PARAMETER_ORDER[group_name] = []
-                        PARAMETERS[parameter_name] = parameter_values
-                        GROUPS_PARAMETER_ORDER[group_name].append(
-                            parameter_name)
-                    parameter_name = None
+                    flush_parameter(parameter_name, parameter_values, group_name)
+                    parameter_name = line[2:].split('?')[0].strip()
                     parameter_values = []
-                # Add line to parameter values list
+                    continue
+                elif parameter_name and group_name and line.startswith("]"):
+                    flush_parameter(parameter_name, parameter_values, group_name)
+                    parameter_name, parameter_values = None, []
+                    continue
                 elif parameter_name:
                     parameter_values.append(line)
-        LOGGER.info("Group para. order: %s",GROUPS_PARAMETER_ORDER)               
+                    continue
+
+        # Final flushes in case file ends without closing blocks
+        flush_argument(argument_name, argument_values)
+        flush_parameter(parameter_name, parameter_values, group_name)
+        flush_group(group_name, syscall_values)
+
+        LOGGER.info("Group para. order: %s", GROUPS_PARAMETER_ORDER)
     except (FileNotFoundError, IOError, ValueError) as e:
         LOGGER.error("Error parsing file %s: %s", filename, e)
 
@@ -116,36 +124,33 @@ def get_question(syscall_nr, argument):
         for syscall in GROUPS_SYSCALL[groups]:
             LOGGER.info("Checking syscall: %s against target: %s", syscall, syscall_nr)
             
-            # If the current system call matches the given syscall_nr
             if syscall == syscall_nr:
                 LOGGER.info("Match found! Syscall %s matches target %s", syscall, syscall_nr)
                 
-                for parameter in GROUPS_PARAMETER_ORDER[groups]:
+                # If the group has no parameters, return the default question
+                param_order = GROUPS_PARAMETER_ORDER.get(groups, [])
+                if not param_order:
+                    default_question = GROUPS_DEFAULT_QUESTION.get(groups, -1)
+                    LOGGER.info("No parameters for group '%s', returning default: %s", groups, default_question)
+                    return default_question
+
+                for parameter in param_order:
                     LOGGER.info("Processing parameter: %s", parameter)
                     parameter_values = set()
-                    
-                    # Iterate through the arguments for the current parameter
                     for arg in PARAMETERS[parameter]:
                         LOGGER.debug("Processing argument: %s", arg)
                         key, value = arg.split("=")
                         value = value.strip()
                         LOGGER.debug("Parsed key: %s, value: %s", key, value)
-                        
-                        # Add entry to the parameter set
                         for a in ARGUMENTS[value]:
                             parameter_values.add(a)
                             LOGGER.debug("Added to parameter_values: %s", a)
-                    
                     LOGGER.info("Parameter '%s' has values: %s", parameter, parameter_values)
                     LOGGER.info("Checking against provided argument: %s", argument)
-                    
-                    # If the rule has required values, check if the syscall's arguments contain all of them.
                     if parameter_values and set(argument).issuperset(parameter_values):
                         LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
                         LOGGER.info("Returning parameter: %s", parameter)
                         return parameter
-                        
-                    # If the length of the given argument is 0 and the parameter has no arguments
                     elif len(argument) == 0 and not parameter_values:
                         LOGGER.info("SUCCESS: Empty argument matches empty parameter_values")
                         LOGGER.info("Returning parameter: %s", parameter)
@@ -162,7 +167,6 @@ def get_question(syscall_nr, argument):
                 LOGGER.debug("No match: %s != %s", syscall, syscall_nr)
 
     LOGGER.warning("No matching parameter found across all groups")
-    # If no matching parameter is found, return -1
     return -1
 
 

@@ -149,11 +149,7 @@ g: FileSystemLinks {
     263 unlinkat(int dirfd, const char *pathname, int flags)
     265 linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags)
     266 symlinkat(const char *target, int newdirfd, const char *linkpath)
-
-    p:FileSystemLinks Placeholder? [
-        flags = write-flags
-
-    ]
+    
 }
 
 g: FileSystemNodeManagementCreate {
@@ -163,19 +159,11 @@ g: FileSystemNodeManagementCreate {
     133 mknod(const char *pathname, mode_t mode, dev_t dev)
     258 mkdirat(int dirfd, const char *pathname, mode_t mode)
     259 mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev)
-
-    p:Do you allow the creation of a directory? [
-
-    ]
 }
 
 g: FileSystemNodeManagementDelete {
     d: Do you allow the removal of a directory 
     84 rmdir(const char *pathname)
-
-    p:Do you allow the removal of a directory? [
-
-    ]
 }
 
 g: FilePermissions {
@@ -188,10 +176,6 @@ g: FilePermissions {
     95 umask(mode_t mask)
     260 fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
     268 fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
-
-    p:FilePermissions Placeholder? [
-
-    ]
 }
 
 g: FileTimestamp {
@@ -199,20 +183,12 @@ g: FileTimestamp {
     132 utime(const char *filename, const struct utimbuf *_Nullable times)
     235 utimes(const char *filename, const struct timeval times[_Nullable 2])
     280 utimensat(int dirfd, const char *pathname, const struct timespec times[_Nullable 2], int flags)
-
-    p:FileTimestamp Placeholder? [
-
-    ]
 }
 
 g: FileTruncation {
-    d: Do you allow changing the size of a file by truncating it?
+    d: Do you allow changing the size of a file by truncating it
     76 truncate(const char *path, off_t length)
     77 ftruncate(int fd, off_t length)
-
-    p:FileTruncation Placeholder? [
-
-    ]
 }
 
 g: FileExtendedAttributes {
@@ -223,8 +199,4 @@ g: FileExtendedAttributes {
     197 removexattr(const char *path, const char *name)
     198 lremovexattr(const char *path, const char *name)
     199 fremovexattr(int fd, const char *name)
-
-    p:FileExtendedAttributes Placeholder? [
-
-    ]
 }
