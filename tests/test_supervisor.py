@@ -7,7 +7,7 @@ This module contains unit tests for the following functionalities:
 
 import json
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, ANY
 from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list
 
 
@@ -215,3 +215,173 @@ def test_setup_zmq(mocker):
     # Then: The socket should be configured and returned    mock_context.return_value.socket.assert_called_once_with(mocker.ANY)
     mock_socket.connect.assert_called_once_with("tcp://localhost:5556")
     assert result == mock_socket
+
+
+import sys
+import types
+import builtins
+
+import pytest
+
+
+def test_main_exits_if_no_program(monkeypatch):
+    """
+    Test that main() exits with error if no program argument is given.
+    """
+    from supervisor import supervisor
+
+    # Patch argv to simulate no program argument
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py"])
+    # Patch LOGGER to capture error
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    # Patch exit to sys.exit so it raises SystemExit
+    import sys as _sys
+    monkeypatch.setattr(supervisor, "exit", _sys.exit)
+    # Patch print to avoid output
+    monkeypatch.setattr(builtins, "print", lambda *a, **k: None)
+
+    with pytest.raises(SystemExit):
+        supervisor.main()
+    mock_logger.error.assert_called_once()
+    # Should log the usage error
+    assert "Nutzung" in mock_logger.error.call_args[0][0]
+
+
+def test_main_sets_up_and_runs(monkeypatch):
+    """
+    Test that main() sets up and runs the main logic with mocks.
+    """
+    from supervisor import supervisor
+
+    # Patch argv to simulate a program argument
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    # Patch LOGGER to capture info
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    # Patch set_program_path, setup_zmq, init_shared_list
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    # Patch Process, PtraceDebugger, and related methods
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate debugger.waitSyscall() returning ProcessExit after one call
+    from ptrace.debugger import ProcessExit
+    mock_event = MagicMock()
+    mock_debugger.waitSyscall.side_effect = [mock_event, ProcessExit(mock_process)]
+    # Patch handle_syscall_event to avoid actual logic
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    # Patch child.join and socket.close
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+
+    supervisor.main()
+
+    # Check that setup and logging happened
+    mock_logger.info.assert_any_call("Starting supervisor for %s", "dummy_prog")
+    supervisor.set_program_path.assert_called_once_with(relative_path="dummy_prog")
+    supervisor.setup_zmq.assert_called_once()
+    supervisor.init_shared_list.assert_called_once_with(socket=mock_socket)
+    mock_child.start.assert_called_once()
+    mock_debugger.addProcess.assert_called_once_with(pid=123, is_attached=False)
+    mock_process.cont.assert_called_once()
+    mock_process.waitSignals.assert_called_once()
+    mock_process.syscall.assert_called()
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+
+def test_main_keyboard_interrupt(monkeypatch):
+    """
+    Test that main() handles KeyboardInterrupt gracefully.
+    """
+    from supervisor import supervisor
+
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate KeyboardInterrupt in the loop
+    mock_debugger.waitSyscall.side_effect = KeyboardInterrupt
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+
+    supervisor.main()
+
+    mock_logger.info.assert_any_call("Exiting supervisor...")
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+
+def test_main_generic_exception(monkeypatch):
+    """
+    Test that main() handles generic Exception in the loop.
+    """
+    from supervisor import supervisor
+
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate Exception in the loop
+    mock_debugger.waitSyscall.side_effect = RuntimeError("fail")
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+
+    supervisor.main()
+
+    # Accept any second argument (the exception object)
+    mock_logger.error.assert_any_call("Exception in main loop: %s", ANY)
+    # Optionally, check that the second argument is the exception and has the right message
+    exc_arg = [call for call in mock_logger.error.call_args_list if call[0][0] == "Exception in main loop: %s"][0][0][1]
+    assert isinstance(exc_arg, RuntimeError)
+    assert str(exc_arg) == "fail"
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
