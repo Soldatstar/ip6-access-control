@@ -73,7 +73,7 @@ pylint:
 build:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m build
 runv: 
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py --debug $(DEMOPROGRAM)
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM) --debug 
 run2v:
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py --debug $(DEMONORMALFILES)	
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py  $(DEMONORMALFILES)	--debug
 .PHONY: help create delete run

@@ -14,7 +14,7 @@ from signal import SIGKILL, SIGUSR1
 from errno import EPERM
 from multiprocessing import Manager, Process
 from itertools import chain
-from collections import Counter
+from collections import Counter, namedtuple
 import argparse
 
 from ptrace.debugger import (
@@ -39,9 +39,9 @@ LOGGER.propagate = False  # Prevent double logging
 
 PROGRAM_RELATIVE_PATH = None
 PROGRAM_ABSOLUTE_PATH = None
-MANAGER = Manager()
-ALLOW_LIST = MANAGER.list()
-DENY_LIST = MANAGER.list()
+
+ALLOW_SET = set()  # Set of tuples: (syscall_nr, arg1, arg2, ...)
+DENY_SET = set()
 SYSCALL_ID_SET = set()
 
 def init_seccomp(deny_list):
@@ -141,12 +141,12 @@ def set_program_path(relative_path):
 
 def init_shared_list(socket):
     """
-    Initialize the shared ALLOW_LIST and DENY_LIST from the database.
+    Initialize the shared ALLOW_SET and DENY_SET from the database.
 
     Args:
         socket (zmq.Socket): ZeroMQ socket for communication.
     """
-    global ALLOW_LIST, DENY_LIST
+    global ALLOW_SET, DENY_SET, SYSCALL_ID_SET
     message = {
         "type": "read_db",
         "body": {
@@ -160,25 +160,24 @@ def init_shared_list(socket):
         response_data = json.loads(response.decode())
         LOGGER.debug("Received response: %s", response_data)
         if response_data['status'] == "success":
+            ALLOW_SET.clear()
+            DENY_SET.clear()
+            SYSCALL_ID_SET.clear()
             for syscall in response_data['data']['allowed_syscalls']:
                 syscall_number = syscall[0]
                 syscall_args = syscall[1]
-                combined_array = [syscall_number] + syscall_args
-                ALLOW_LIST.append(combined_array)
-
+                ALLOW_SET.add(tuple([syscall_number] + syscall_args))
             for syscall in response_data['data']['denied_syscalls']:
                 syscall_number = syscall[0]
                 syscall_args = syscall[1]
-                combined_array = [syscall_number] + syscall_args
-                DENY_LIST.append(combined_array)
+                DENY_SET.add(tuple([syscall_number] + syscall_args))
             rules = response_data['data']['blacklisted_ids']
             for syscall_id in rules:
                 SYSCALL_ID_SET.add(syscall_id)
             LOGGER.info("Shared list initialized successfully.")
-            LOGGER.debug("ALLOW_LIST: %s", ALLOW_LIST)
-            LOGGER.debug("DENY_LIST: %s", DENY_LIST)
+            LOGGER.debug("ALLOW_SET: %s", ALLOW_SET)
+            LOGGER.debug("DENY_SET: %s", DENY_SET)
             LOGGER.debug("Dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
-
             break
         elif response_data['status'] == "error":
             LOGGER.error("Error initializing shared list: %s", response_data['data'])
@@ -196,17 +195,16 @@ def is_already_decided(syscall_nr, arguments):
     Returns:
         bool: True if the decision is already made, False otherwise.
     """
-    for decision in chain(ALLOW_LIST, DENY_LIST):
-        if decision[0] == syscall_nr:
-            decision_args = decision[1:]
-            if len(decision_args) == len(arguments):
-                # Compare each argument, allowing for wildcards
-                match = all(
-                    d_arg == "*" or d_arg == a_arg
-                    for d_arg, a_arg in zip(decision_args, arguments)
-                )
-                if match:
-                    return True
+    key = tuple([syscall_nr] + arguments)
+    # Fast O(1) check
+    if key in ALLOW_SET or key in DENY_SET:
+        return True
+    # Wildcard support: check for any tuple with "*" in place of any argument
+    # (e.g., (nr, "*", ...)), but only if needed
+    for allow_key in ALLOW_SET.union(DENY_SET):
+        if allow_key[0] == syscall_nr and len(allow_key) == len(key):
+            if all(a == "*" or a == b for a, b in zip(allow_key[1:], key[1:])):
+                return True
     return False
 
 
@@ -234,6 +232,60 @@ def prepare_arguments(syscall_args):
     return arguments
 
 
+def handle_syscall_event(event, process, socket):
+    """
+    Handle a syscall event: check, log, and ask for permission if needed.
+
+    Args:
+        event: The syscall event to handle.
+        process: The process being traced.
+        socket: The ZeroMQ socket for communication.
+    """
+    state = event.process.syscall_state
+    syscall = state.event(FunctionCallOptions())
+
+    if syscall.result is None:
+        syscall_number = syscall.syscall
+        if syscall_number not in SYSCALL_ID_SET:
+            LOGGER.debug("Skipping non blacklisted call: %s", syscall_number)
+            process.syscall()
+            return
+
+        LOGGER.info("Syscall number: %s", syscall_number)
+        syscall_args = prepare_arguments(syscall_args=syscall.arguments)
+        syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
+        combined_tuple = tuple([syscall_number] + syscall_args)
+        LOGGER.info("Catching new syscall: %s", syscall.format())
+
+        if not is_already_decided(syscall_nr=syscall_number, arguments=syscall_args):
+            decision = ask_for_permission_zmq(
+                syscall_name=syscall.name,
+                syscall_nr=syscall_number,
+                arguments_raw=syscall_args,
+                arguments_formated=syscall_args_formated,
+                socket=socket
+            )
+
+            if decision["decision"] == "ALLOW":
+                LOGGER.info("Decision: ALLOW Syscall: %s", syscall.format())
+                size_before = len(SYSCALL_ID_SET)
+                ALLOW_SET.add(combined_tuple)
+                for sid in decision.get("allowed_ids", []):
+                    SYSCALL_ID_SET.discard(sid)
+                LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
+                LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
+            if decision["decision"] == "DENY":
+                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
+                DENY_SET.add(combined_tuple)
+                process.setreg('orig_rax', -EPERM)
+                process.syscall()
+                event.process.debugger.waitSyscall()
+                process.setreg('rax', -EPERM)
+        else:
+            LOGGER.debug("Decision for syscall: %s was already decided", syscall.format())
+    process.syscall()
+
+
 def main():
     """
     Main function to start the supervisor.
@@ -250,7 +302,7 @@ def main():
     socket = setup_zmq()
     init_shared_list(socket=socket)
 
-    child = Process(target=child_prozess, args=(DENY_LIST, argv))
+    child = Process(target=child_prozess, args=(DENY_SET, argv))
     debugger = PtraceDebugger()
     debugger.traceFork()
     child.start()
@@ -260,78 +312,35 @@ def main():
     event = process.waitSignals(SIGUSR1)
     process.syscall()
 
-    while True:
+    running = True
+    while running:
         try:
             event = debugger.waitSyscall()
-            state = event.process.syscall_state
-            syscall = state.event(FunctionCallOptions())
-
-            if syscall.result is None:
-                syscall_number = syscall.syscall
-
-                if syscall_number not in SYSCALL_ID_SET:
-                    LOGGER.debug("Skipping non blacklisted call: %s", syscall_number)
-                    process.syscall()
-                    continue
-                LOGGER.info("Syscall number: %s", syscall_number)
-                syscall_args = prepare_arguments(syscall_args=syscall.arguments)
-                syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
-                combined_array = [syscall_number] + syscall_args
-                LOGGER.info("Catching new syscall: %s", 
-                            syscall.format())
-
-                if not is_already_decided(syscall_nr=syscall_number, arguments=syscall_args):
-                    decision = ask_for_permission_zmq(
-                        syscall_name=syscall.name,
-                        syscall_nr=syscall_number,
-                        arguments_raw=syscall_args,
-                        arguments_formated=syscall_args_formated,
-                        socket=socket
-                    )
-
-                    if decision["decision"] == "ALLOW":
-                        LOGGER.info("Decision: ALLOW Syscall: %s", syscall.format())
-                        size_before = len(SYSCALL_ID_SET)
-                        ALLOW_LIST.append(combined_array)
-                        for sid in decision.get("allowed_ids", []):
-                            SYSCALL_ID_SET.discard(sid)
-                        LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
-                        LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
-                    if decision["decision"] == "DENY":
-                        LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
-                        DENY_LIST.append(combined_array)
-                        process.setreg('orig_rax', -EPERM)
-                        process.syscall()
-                        debugger.waitSyscall()
-                        process.setreg('rax', -EPERM)
-                else:
-                    LOGGER.debug("Decision for syscall: %s was already decided", syscall.format())
-
-            process.syscall()
-
-        except ProcessSignal as event:
-            LOGGER.info("***SIGNAL***: %s", event.name)
-            process.syscall()
-            continue
-
-        except NewProcessEvent as event:
-            LOGGER.info("***CHILD-PROCESS***")
-            # TODO: Observe the Child with the debugger
-            subprocess = event.process
-            subprocess.parent.syscall()
-            continue
-
-        except ProcessExit as event:
-            LOGGER.info("***PROCESS-EXECUTED***")
-            break
-
+            if isinstance(event, ProcessSignal):
+                LOGGER.info("***SIGNAL***: %s", event.name)
+                process.syscall()
+                continue
+            elif isinstance(event, NewProcessEvent):
+                LOGGER.info("***CHILD-PROCESS***")
+                # TODO: Observe the Child with the debugger
+                subprocess = event.process
+                subprocess.parent.syscall()
+                continue
+            elif isinstance(event, ProcessExit):
+                LOGGER.info("***PROCESS-EXECUTED***")
+                running = False
+                break
+            else:
+                handle_syscall_event(event, process, socket)
         except KeyboardInterrupt:
             LOGGER.info("Exiting supervisor...")
-            break
+            running = False
+        except Exception as e:
+            LOGGER.error("Exception in main loop: %s", e)
+            running = False
 
     debugger.quit()
     child.join()
-    MANAGER.shutdown()
     socket.close()
 
 

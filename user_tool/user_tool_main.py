@@ -30,6 +30,7 @@ from user_tool.policy_manager import Policy
 
 # Directories
 POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories("user_tool.log", "User-Tool")
+LOGGER.propagate = False  # Prevent double logging
 
 # Global variables
 REQUEST_QUEUE = queue.Queue()

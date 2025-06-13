@@ -8,7 +8,7 @@ This module contains unit tests for the following functionalities:
 import json
 import os
 from unittest.mock import MagicMock, patch
-from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list,ALLOW_LIST, DENY_LIST
+from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list
 
 
 def test_ask_for_permission_zmq():
@@ -71,9 +71,9 @@ def test_is_already_decided_true():
     """
     Test when a decision is already made for the given syscall and arguments.
     """
-    # Given: Mocked ALLOW_LIST and DENY_LIST with a matching decision
-    with patch("supervisor.supervisor.ALLOW_LIST", [[2, "arg1", "arg2"]]), \
-            patch("supervisor.supervisor.DENY_LIST", []):
+    # Given: Mocked ALLOW_SET and DENY_SET with a matching decision
+    with patch("supervisor.supervisor.ALLOW_SET", {(2, "arg1", "arg2")}), \
+         patch("supervisor.supervisor.DENY_SET", set()):
         syscall_nr = 2
         arguments = ["arg1", "arg2"]
 
@@ -88,9 +88,9 @@ def test_is_already_decided_false():
     """
     Test when no decision is made for the given syscall and arguments.
     """
-    # Given: Mocked ALLOW_LIST and DENY_LIST without a matching decision
-    with patch("supervisor.supervisor.ALLOW_LIST", [[2, "arg1", "arg2"]]), \
-            patch("supervisor.supervisor.DENY_LIST", [[3, "arg3"]]):
+    # Given: Mocked ALLOW_SET and DENY_SET without a matching decision
+    with patch("supervisor.supervisor.ALLOW_SET", {(2, "arg1", "arg2")}), \
+         patch("supervisor.supervisor.DENY_SET", {(3, "arg3")}):
         syscall_nr = 2
         arguments = ["arg3"]
 
@@ -123,7 +123,7 @@ def test_prepare_arguments():
 
 def test_init_shared_list_success(mocker):
     """
-    Test initializing the shared list when the server responds successfully.
+    Test initializing the shared set when the server responds successfully.
     """
     # Given: Mock socket and server response
     mock_socket = MagicMock()
@@ -139,19 +139,18 @@ def test_init_shared_list_success(mocker):
         [b'', json.dumps(mock_response).encode()]
     ]
 
-    # Mock ALLOW_LIST and DENY_LIST
-    mock_allow_list = mocker.patch("supervisor.supervisor.ALLOW_LIST", [])
-    mock_deny_list = mocker.patch("supervisor.supervisor.DENY_LIST", [])
+    # Mock ALLOW_SET and DENY_SET
+    mock_allow_set = mocker.patch("supervisor.supervisor.ALLOW_SET", set())
+    mock_deny_set = mocker.patch("supervisor.supervisor.DENY_SET", set())
     mock_syscall_id_set = mocker.patch("supervisor.supervisor.SYSCALL_ID_SET", set())
 
     # When: The init_shared_list function is called
     from supervisor import supervisor
     supervisor.init_shared_list(socket=mock_socket)
 
-    # Then: ALLOW_LIST and DENY_LIST should be populated correctly
-    # The logic appends [nr] + args, so flatten the lists
-    assert list(mock_allow_list) == [[2, "arg1", "arg2"]]
-    assert list(mock_deny_list) == [[3, "arg3"]]
+    # Then: ALLOW_SET and DENY_SET should be populated correctly
+    assert (2, "arg1", "arg2") in mock_allow_set
+    assert (3, "arg3") in mock_deny_set
     assert mock_syscall_id_set == {2, 3}
 
     # And: The correct message should be sent
@@ -168,7 +167,7 @@ def test_init_shared_list_success(mocker):
 
 def test_init_shared_list_error(mocker):
     """
-    Test initializing the shared list when the server responds with an error.
+    Test initializing the shared set when the server responds with an error.
     """
     # Given: Mock socket and server response
     mock_socket = MagicMock()
@@ -179,16 +178,17 @@ def test_init_shared_list_error(mocker):
     mock_socket.recv_multipart.side_effect = [
         [b'', json.dumps(mock_response).encode()]
     ]
-    mocker.patch("supervisor.supervisor.ALLOW_LIST", [])
-    mocker.patch("supervisor.supervisor.DENY_LIST", [])
+    mocker.patch("supervisor.supervisor.ALLOW_SET", set())
+    mocker.patch("supervisor.supervisor.DENY_SET", set())
 
     # When: The init_shared_list function is called
-    init_shared_list(socket=mock_socket)
+    from supervisor import supervisor
+    supervisor.init_shared_list(socket=mock_socket)
 
-    # Then: ALLOW_LIST and DENY_LIST should remain empty
-    from supervisor.supervisor import ALLOW_LIST, DENY_LIST
-    assert ALLOW_LIST == []
-    assert DENY_LIST == []
+    # Then: ALLOW_SET and DENY_SET should remain empty
+    from supervisor.supervisor import ALLOW_SET, DENY_SET
+    assert ALLOW_SET == set()
+    assert DENY_SET == set()
 
     # And: The correct message should be sent
     expected_message = {
@@ -200,7 +200,6 @@ def test_init_shared_list_error(mocker):
     mock_socket.send_multipart.assert_called_once_with(
         [b'', json.dumps(expected_message).encode()]
     )
-
 
 
 def test_setup_zmq(mocker):
