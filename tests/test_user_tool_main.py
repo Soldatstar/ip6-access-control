@@ -17,11 +17,7 @@ from pathlib import Path
 
 
 def test_handle_requests_valid_req_decision(monkeypatch):
-    """
-    Test handling a valid 'req_decision' request.
-    This test ensures that the function processes the request and sends the correct response.
-    """
-    # Given: A valid 'req_decision' request in the queue
+    # Given
     mock_socket = MagicMock()
     mock_identity = b"client1"
     mock_message = {
@@ -42,14 +38,13 @@ def test_handle_requests_valid_req_decision(monkeypatch):
     monkeypatch.setattr("user_tool.user_tool_main.user_interaction", mock_utils)
     mock_policy_manager = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
-    # Patch group_selector.get_group_for_syscall to return a group
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_group_for_syscall", lambda x: "TestGroup")
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [42])
 
-    # When: The handle_requests function is called
+    # When
     user_tool_main.handle_requests()
 
-    # Then: The correct response should be sent back
+    # Then
     expected_response = {
         "status": "success",
         "data": {"decision": "ALLOW", "allowed_ids": [42]}
@@ -62,11 +57,7 @@ def test_handle_requests_valid_req_decision(monkeypatch):
 
 
 def test_handle_requests_invalid_message_format(monkeypatch):
-    """
-    Test handling an invalid message format.
-    This test ensures that the function logs an error and sends an error response.
-    """
-    # Given: An invalid message in the queue
+    # Given
     mock_socket = MagicMock()
     mock_identity = b"client1"
     mock_message = {"invalid": "message"}
@@ -74,10 +65,10 @@ def test_handle_requests_invalid_message_format(monkeypatch):
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
 
-    # When: The handle_requests function is called
+    # When
     user_tool_main.handle_requests()
 
-    # Then: An error response should be sent back
+    # Then
     expected_response = {
         "status": "error",
         "data": {"message": "Invalid message format"}
@@ -89,11 +80,7 @@ def test_handle_requests_invalid_message_format(monkeypatch):
 
 
 def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
-    """
-    Test handling a 'read_db' request when no policy exists.
-    This test ensures that the function sends the default policy in the response.
-    """
-    # Given: A 'read_db' request with no corresponding policy file
+    # Given
     mock_socket = MagicMock()
     mock_identity = b"client1"
     mock_message = {
@@ -104,21 +91,16 @@ def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
-
-    # Patch group_selector.get_groups_structure and get_syscalls_for_group
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_groups_structure", lambda x: {"A": [1], "B": [2]})
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [1] if group == "A" else [2])
-
-    # Load the actual default policy from ../user_tool/default.json
     default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
     with open(default_policy_path, "r", encoding="UTF-8") as default_file:
         default_policy = json.load(default_file)
 
-    # When: The handle_requests function is called
+    # When
     user_tool_main.handle_requests()
 
-    # Then: The default policy should be sent back
-    # The response should include blacklisted_ids
+    # Then
     expected_data = default_policy["rules"].copy()
     expected_data["blacklisted_ids"] = [1, 2]
     expected_response = {
@@ -133,11 +115,7 @@ def test_handle_requests_read_db_no_policy(monkeypatch, tmp_path):
 
 
 def test_handle_requests_read_db_valid_policy(monkeypatch, tmp_path):
-    """
-    Test handling a 'read_db' request with a valid policy.
-    This test ensures that the function sends the correct policy data in the response.
-    """
-    # Given: A 'read_db' request with a valid policy file
+    # Given
     mock_socket = MagicMock()
     mock_identity = b"client1"
     mock_message = {
@@ -145,30 +123,25 @@ def test_handle_requests_read_db_valid_policy(monkeypatch, tmp_path):
         "body": {"program": "/path/to/program"}
     }
     program_hash = hashlib.sha256(
-        "/path/to/program".encode()).hexdigest()  # Ensure hash matches
+        "/path/to/program".encode()).hexdigest()
     policy_dir = tmp_path / program_hash
     policy_dir.mkdir()
     policy_file = policy_dir / "policy.json"
-    # Valid policy content
     policy_file.write_text(json.dumps({"rules": {"allowed_syscalls": [[42, ["foo"]]], "allowed_groups": ["A"]}}))
     user_tool_main.REQUEST_QUEUE.put((mock_socket, mock_identity, mock_message))
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     monkeypatch.setattr("user_tool.user_tool_main.POLICIES_DIR", str(tmp_path))
-
-    # Patch group_selector.get_groups_structure and get_syscalls_for_group
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_groups_structure", lambda x: {"A": [1], "B": [2]})
     monkeypatch.setattr("user_tool.user_tool_main.group_selector.get_syscalls_for_group", lambda group: [1] if group == "A" else [2])
-
-    # Load the actual default policy from ../user_tool/default.json
     default_policy_path = Path(__file__).resolve().parent.parent / "user_tool" / "default.json"
     with open(default_policy_path, "r", encoding="UTF-8") as default_file:
         default_policy = json.load(default_file)
 
-    # When: The handle_requests function is called
+    # When
     user_tool_main.handle_requests()
 
-    # Then: The correct policy data should be sent back, including default rules and blacklisted_ids
+    # Then
     expected_rules = {
         "allowed_syscalls": default_policy["rules"]["allowed_syscalls"] + [[42, ["foo"]]],
         "denied_syscalls": [],
@@ -186,32 +159,23 @@ def test_handle_requests_read_db_valid_policy(monkeypatch, tmp_path):
         "status": "success",
         "data": expected_rules_ordered
     }
-    # Fix: Access the sent JSON correctly
-    sent_args = mock_socket.send_multipart.call_args[0][0]  # This is the list passed to send_multipart
-    actual_json = sent_args[2]  # The third element is the JSON bytes
+    sent_args = mock_socket.send_multipart.call_args[0][0]
+    actual_json = sent_args[2]
     assert json.loads(actual_json.decode()) == expected_response
     mock_logger.debug.assert_called_once_with(
         "Policy for %s: %s", program_hash, mock.ANY)
 
 
 def test_zmq_listener(monkeypatch):
-    """
-    Test the zmq_listener function.
-    This test ensures that the listener correctly processes valid and invalid messages.
-    """
-    # Given: A mock ZeroMQ context and socket
+    # Given
     mock_context = MagicMock()
     mock_socket = MagicMock()
     mock_context.socket.return_value = mock_socket
     monkeypatch.setattr("zmq.Context", lambda: mock_context)
-
-    # And: Mock LOGGER and REQUEST_QUEUE
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     mock_request_queue = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.REQUEST_QUEUE", mock_request_queue)
-
-    # And: Valid and invalid messages
     valid_message = json.dumps({"type": "req_decision", "body": {}}).encode()
     invalid_message = b"Invalid JSON"
     mock_socket.recv_multipart.side_effect = [
@@ -220,45 +184,81 @@ def test_zmq_listener(monkeypatch):
         zmq.ZMQError("Mocked error")
     ]
 
-    # When: The zmq_listener function is called
-    with patch("threading.Thread", lambda *args, **kwargs: None):  # Prevent threading issues
+    # When
+    with patch("threading.Thread", lambda *args, **kwargs: None):
         try:
             user_tool_main.zmq_listener()
         except zmq.ZMQError:
-            pass  # Expected due to mocked error
+            pass
 
-    # Then: Valid messages should be added to the queue
+    # Then
     mock_request_queue.put.assert_called_once_with(
         (mock_socket, b"client1", json.loads(valid_message)))
-
-    # And: Invalid messages should log an error and send an error response
     mock_logger.error.assert_any_call("Failed to decode JSON message")
     mock_socket.send_multipart.assert_called_once_with(
         [b"client2", b"", json.dumps({"error": "Invalid JSON"}).encode()]
     )
-
-    # And: The listener should log the ZeroMQ error with the correct exception object
     mock_logger.error.assert_any_call("ZeroMQ error: %s", mock.ANY)
 
 
 def test_main_list_known_apps(monkeypatch):
-    """
-    Test the 'List Known Apps' option in the main menu.
-    This test ensures that the function calls the appropriate policy manager method.
-    """
-    # Given: Mock user input and policy manager
+    # Given
     mock_logger = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
     mock_policy_manager = MagicMock()
     monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
     monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "1")
-    monkeypatch.setattr("os.system", lambda _: None)  # Mock os.system to prevent clearing the console
-
-    # Mock threading.Thread to prevent actual thread creation
+    monkeypatch.setattr("os.system", lambda _: None)
     mock_thread = MagicMock()
     monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
 
-    # When: The main function is called and the user selects option 1
+    # When
+    with patch("builtins.input", lambda _: None):
+        user_tool_main.main(test_mode=True)
+
+    # Then
+    mock_policy_manager.list_known_apps.assert_called_once()
+    mock_logger.info.assert_any_call("Listing known apps...")
+    mock_thread.start.assert_called_once()
+
+
+def test_main_delete_all_policies(monkeypatch):
+    # Given
+    mock_logger = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
+    mock_policy_manager = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.policy_manager", mock_policy_manager)
+    monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "2")
+    monkeypatch.setattr("os.system", lambda _: None)
+    mock_thread = MagicMock()
+    monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
+
+    # When
+    with patch("builtins.input", lambda _: None):
+        user_tool_main.main(test_mode=True)
+
+    # Then
+    mock_policy_manager.delete_all_policies.assert_called_once()
+    mock_logger.info.assert_any_call("Deleting all policies...")
+    mock_thread.start.assert_called_once()
+
+
+def test_main_exit(monkeypatch):
+    # Given
+    mock_logger = MagicMock()
+    monkeypatch.setattr("user_tool.user_tool_main.LOGGER", mock_logger)
+    monkeypatch.setattr("user_tool.user_tool_main.user_interaction.non_blocking_input", lambda _: "3")
+    monkeypatch.setattr("os.system", lambda _: None)
+    mock_thread = MagicMock()
+    monkeypatch.setattr("threading.Thread", lambda *args, **kwargs: mock_thread)
+
+    # When
+    with patch("builtins.input", lambda _: None):
+        user_tool_main.main()
+
+    # Then
+    mock_logger.info.assert_any_call("Exiting User Tool.")
+    mock_thread.start.assert_called_once()
     with patch("builtins.input", lambda _: None):  # Mock input to prevent blocking
         user_tool_main.main(test_mode=True)
 
