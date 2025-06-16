@@ -329,5 +329,7 @@ if __name__ == "__main__":
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=log_level)
     LOGGER.setLevel(log_level)
+    for handler in LOGGER.handlers:
+        handler.setLevel(log_level)    
 
     main(test_mode=args.test, debug=args.debug)

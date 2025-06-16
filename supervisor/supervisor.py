@@ -16,7 +16,7 @@ from multiprocessing import Manager, Process
 from itertools import chain
 from collections import Counter, namedtuple
 import argparse
-
+import logging
 from ptrace.debugger import (
     PtraceDebugger, ProcessExit, NewProcessEvent, ProcessSignal)
 from ptrace.func_call import FunctionCallOptions
@@ -55,16 +55,21 @@ def init_seccomp(deny_list):
 
     for deny_decision in deny_list:
         syscall_nr = deny_decision[0]
+        LOGGER.debug("Processing deny decision for syscall_nr: %s", syscall_nr)
         for i in range(len(deny_decision[1:])):
             try:
                 # TODO: Look at seccomp how path to files are handled
                 if not isinstance(deny_decision[1:][i], str):
+                    LOGGER.debug("Adding rule for syscall_nr: %s, Argument: %s",
+                                 syscall_nr, deny_decision[1:][i])
                     sys_filter.add_rule(TRAP, syscall_nr, Arg(
                         i, EQ, deny_decision[1:][i]))
             except TypeError as e:
                 LOGGER.warning("TypeError: %s - For syscall_nr: %s, Argument: %s",
                                e, syscall_nr, deny_decision[1:][i])
-
+    LOGGER.info("Seccomp filter initialized with deny list: %s", deny_list)
+    # Load the seccomp filter
+    LOGGER.info("Loading seccomp filter")
     sys_filter.load()
 
 
@@ -159,6 +164,7 @@ def init_shared_list(socket):
         _, response = socket.recv_multipart()
         response_data = json.loads(response.decode())
         LOGGER.debug("Received response: %s", response_data)
+        LOGGER.info("Response status: %s", response_data['status'])
         if response_data['status'] == "success":
             ALLOW_SET.clear()
             DENY_SET.clear()
@@ -286,6 +292,9 @@ def handle_syscall_event(event, process, socket):
     process.syscall()
 
 
+import traceback
+from ptrace.debugger import PtraceDebugger, ProcessExit, NewProcessEvent, ProcessSignal
+
 def main():
     """
     Main function to start the supervisor.
@@ -297,6 +306,7 @@ def main():
         print("Nutzung: %s program" % argv[0], file=stderr)
         LOGGER.error("Nutzung: %s program", argv[0])
         exit(1)
+
     LOGGER.info("Starting supervisor for %s", argv[1])
     set_program_path(relative_path=argv[1])
     socket = setup_zmq()
@@ -306,39 +316,52 @@ def main():
     debugger = PtraceDebugger()
     debugger.traceFork()
     child.start()
+    LOGGER.debug("Starting child process with deny list: %s", DENY_SET)
+
     process = debugger.addProcess(pid=child.pid, is_attached=False)
 
+    # Wait for child to exec and raise SIGUSR1
     process.cont()
     event = process.waitSignals(SIGUSR1)
     process.syscall()
 
     running = True
+    LOGGER.debug("Starting main loop to monitor syscalls")
     while running:
         try:
+            # This will either return a syscall event or raise ProcessSignal on SIGTRAP
             event = debugger.waitSyscall()
-            if isinstance(event, ProcessSignal):
-                LOGGER.info("***SIGNAL***: %s", event.name)
-                process.syscall()
-                continue
-            elif isinstance(event, NewProcessEvent):
+
+            # New forked child?
+            if isinstance(event, NewProcessEvent):
                 LOGGER.info("***CHILD-PROCESS***")
-                # TODO: Observe the Child with the debugger
-                subprocess = event.process
-                subprocess.parent.syscall()
+                event.process.parent.syscall()
                 continue
-            elif isinstance(event, ProcessExit):
+
+            # Process exited?
+            if isinstance(event, ProcessExit):
                 LOGGER.info("***PROCESS-EXECUTED***")
-                running = False
                 break
-            else:
-                handle_syscall_event(event, process, socket)
+
+            # Otherwise it’s a syscall event
+            handle_syscall_event(event, process, socket)
+
+        except ProcessSignal as sig:
+            # Catches the SIGTRAP from seccomp or ptrace syscall stops
+            LOGGER.debug("***SIGNAL***: %s", sig.name)
+            process.syscall()
+            continue
+
         except KeyboardInterrupt:
             LOGGER.info("Exiting supervisor...")
-            running = False
+            break
+
         except Exception as e:
             LOGGER.error("Exception in main loop: %s", e)
-            running = False
+            LOGGER.debug("Traceback: %s", traceback.format_exc())
+            break
 
+    # Cleanup
     debugger.quit()
     child.join()
     socket.close()
@@ -349,11 +372,13 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args, unknown = parser.parse_known_args()
 
-    import logging
     log_level = logging.DEBUG if args.debug else logging.INFO
     LOGGER.setLevel(log_level)
+    for handler in LOGGER.handlers:
+        handler.setLevel(log_level)
     if args.debug:
         LOGGER.info("Debug mode is enabled. Logging level set to DEBUG.")
+        LOGGER.debug("Unknown arguments: %s", unknown)
 
     # Pass through unknown args (e.g., program to supervise)
     sys.argv = [sys.argv[0]] + unknown
