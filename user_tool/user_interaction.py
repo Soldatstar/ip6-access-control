@@ -9,119 +9,91 @@ from user_tool import group_selector
 # Configuration file for the syscall conversion with parameters for the appropriate question.
 GROUP_FILE = "user_tool/groups"
 LOGGER = logging.getLogger("User-Tool")
-def ask_permission(syscall_nr, program_name, program_hash, parameter_formated, parameter_raw):
-    """
-    Prompt the user for permission to allow or deny a syscall operation.
+def ask_permission(syscall_nr, program_name, program_hash,
+                   parameter_formated, parameter_raw):
 
-    This function provides both a graphical user interface (GUI) and a command-line
-    interface (CLI) for the user to make a decision regarding a syscall operation.
-    The decision can be "ALLOW", "DENY", or "ONE_TIME". The GUI and CLI run
-    concurrently, and the first decision made by the user is returned.
-
-    Args:
-        syscall_nr (int): The syscall number being requested.
-        program_name (str): The name of the program requesting the syscall.
-        program_hash (str): A unique hash representing the program.
-        parameter_formated (str): A formatted string of the syscall parameters.
-        parameter_raw (str): A unformatted string of the syscall parameters.
-        logger (logging.Logger): A logger instance for logging messages.
-
-    Returns:
-        str: The user's decision, which can be "ALLOW", "DENY", or "ONE_TIME".
-    """
-    decision = {'value': None}
-    q = queue.Queue()
-    after_id = None
+    # Prepare question text
     group_selector.parse_file(filename=GROUP_FILE)
     args = group_selector.argument_separator(
-        argument_raw=parameter_raw, 
+        argument_raw=parameter_raw,
         argument_pretty=parameter_formated
     )
-    question = group_selector.get_question(syscall_nr=syscall_nr,argument=args)
-    LOGGER.info("group_selector.get_question: %s", question)
+    question = group_selector.get_question(
+        syscall_nr=syscall_nr, argument=args
+    )
     if question == -1:
         question = f"Allow operation for syscall {syscall_nr}"
     LOGGER.info("Question: %s", question)
+
+    decision = {'value': None}
     def set_decision(choice):
-        nonlocal after_id
         if decision['value'] is None:
             decision['value'] = choice
-            q.put(choice)  # Ensure the decision is added to the queue for consistency
-            if after_id is not None:
-                try:
-                    root.after_cancel(after_id)
-                except tk.TclError:
-                    pass
-            if root.winfo_exists():  # Ensure root exists before attempting to destroy
-                root.destroy()
+            # immediately tear down everything
+            try:
+                root.deletefilehandler(sys.stdin)
+            except Exception:
+                pass
+            root.destroy()
 
-    def ask_cli():
-        prompt = (
-            f"{question}?\n"
-            f"            Program: {program_name}\n"
-            #f"            Hash: {program_hash}\n"
-            f"            Parameter: {parameter_formated}\n"
-            "             ( (y)es / (t)his / (n)o / (o)ne ): "
-        )
-        mapping = {
-            'yes': 'ALLOW',   'y': 'ALLOW',
-            'this': 'ALLOW_THIS', 't': 'ALLOW_THIS',
-            'no':  'DENY',    'n': 'DENY',
-            'one': 'ONE_TIME','o': 'ONE_TIME',
-        }
-        LOGGER.info(prompt)
-        while decision['value'] is None:
-            r, _, _ = select.select([sys.stdin], [], [], 4.0)
-            if r:
-                ans = sys.stdin.readline().strip().lower()
-                choice = mapping.get(ans)
-                if choice:
-                    q.put(choice)
-                    break
-
-    def poll_queue():
-        nonlocal after_id
-        try:
-            choice = q.get_nowait()
-        except queue.Empty:
-            after_id = root.after(100, poll_queue)
-        else:
+    # CLI‑mapping via stdin
+    mapping = {
+        'yes': 'ALLOW',   'y': 'ALLOW',
+        'this': 'ALLOW_THIS', 't': 'ALLOW_THIS',
+        'no':  'DENY',    'n': 'DENY',
+        'one': 'ONE_TIME','o': 'ONE_TIME',
+    }
+    def on_stdin(_, mask):
+        """Called in the mainloop when stdin is readable."""
+        line = sys.stdin.readline()
+        if not line:
+            return
+        key = line.strip().lower()
+        choice = mapping.get(key)
+        if choice:
             set_decision(choice)
 
+    # Build the GUI
     root = tk.Tk()
     root.title("Permission Request")
+    width = max(400, len(parameter_formated)*7 + 150)
+    root.geometry(f"{width}x200")
 
-    text_width = max(len(program_name), len(program_hash)) * 7
-    width = max(400, text_width + 150)
-    height = 150 + 50
-
-    root.geometry(f"{width}x{height}")
-
-    lbl = tk.Label(
+    tk.Label(
         root,
         text=(
             f"{question}?\n"
             f"Program: {program_name}\n"
-            #f"Hash: {program_hash}\n"
             f"Parameter: {parameter_formated}"
         ),
-        wraplength=350
-    )
-    lbl.pack(pady=20)
+        wraplength=width-50
+    ).pack(pady=20)
 
     btn_frame = tk.Frame(root)
-    btn_frame.pack(pady=10)
+    btn_frame.pack()
     for txt, val in [
         ("Allow (Group)", "ALLOW"),
         ("Allow Only This", "ALLOW_THIS"),
         ("Deny", "DENY"),
         ("One Time", "ONE_TIME")
     ]:
-        tk.Button(btn_frame, text=txt, width=15,
-                  command=lambda v=val: set_decision(v)).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame, text=txt, width=15,
+            command=lambda v=val: set_decision(v)
+        ).pack(side=tk.LEFT, padx=5)
 
-    threading.Thread(target=ask_cli, daemon=True).start()
-    after_id = root.after(100, poll_queue)
+    # Tell Tk to watch stdin in the mainloop
+    root.createfilehandler(sys.stdin, tk.READABLE, on_stdin)
+
+    # Run until either a button or stdin choice destroys root
+
+    prompt = (
+        f"{question}?\n"
+        f"    Program: {program_name}\n"
+        f"    Parameter: {parameter_formated}\n"
+        "    (y)es / (t)his / (n)o / (o)ne: "
+    )
+    print(prompt, end="", flush=True)
 
     root.mainloop()
     LOGGER.info("User decision: %s", decision['value'])
