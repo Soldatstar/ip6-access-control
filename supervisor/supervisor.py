@@ -329,37 +329,37 @@ def main():
     LOGGER.debug("Starting main loop to monitor syscalls")
     while running:
         try:
-            # This will either return a syscall event or raise ProcessSignal on SIGTRAP
-            event = debugger.waitSyscall()
+             # This will either return a syscall event or raise ProcessSignal/NewProcessEvent/ProcessExit
+             event = debugger.waitSyscall()
 
-            # New forked child?
-            if isinstance(event, NewProcessEvent):
-                LOGGER.info("***CHILD-PROCESS***")
-                event.process.parent.syscall()
-                continue
-
-            # Process exited?
-            if isinstance(event, ProcessExit):
-                LOGGER.info("***PROCESS-EXECUTED***")
-                break
-
-            # Otherwise it’s a syscall event
-            handle_syscall_event(event, process, socket)
+             # If it's genuinely a syscall event, handle it:
+             handle_syscall_event(event, process, socket)
 
         except ProcessSignal as sig:
-            # Catches the SIGTRAP from seccomp or ptrace syscall stops
-            LOGGER.debug("***SIGNAL***: %s", sig.name)
-            process.syscall()
+             # SIGTRAP from ptrace/seccomp → advance child
+             LOGGER.debug("***SIGNAL***: %s", sig.name)
+             process.syscall()
+             continue
+
+        except NewProcessEvent as newproc:
+            # A child fork/exec’d: re‐attach and advance
+            LOGGER.info("***CHILD-PROCESS***")
+            newproc.process.parent.syscall()
             continue
 
-        except KeyboardInterrupt:
-            LOGGER.info("Exiting supervisor...")
+        except ProcessExit:
+            LOGGER.info("***PROCESS-EXECUTED***")
             break
 
+        except KeyboardInterrupt:
+             LOGGER.info("Exiting supervisor...")
+             break
+
         except Exception as e:
-            LOGGER.error("Exception in main loop: %s", e)
-            LOGGER.debug("Traceback: %s", traceback.format_exc())
-            break
+             LOGGER.error("Exception in main loop: %s", e)
+             LOGGER.debug("Traceback: %s", traceback.format_exc())
+             break
+
 
     # Cleanup
     debugger.quit()
