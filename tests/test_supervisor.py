@@ -8,7 +8,7 @@ This module contains unit tests for the following functionalities:
 import json
 import os
 from unittest.mock import MagicMock, patch, ANY
-from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list
+from supervisor.supervisor import ask_for_permission_zmq, check_decision_made, prepare_arguments, setup_zmq, init_shared_list
 
 
 def test_ask_for_permission_zmq():
@@ -67,7 +67,7 @@ def test_ask_for_permission_zmq():
     )
 
 
-def test_is_already_decided_true():
+def test_check_decision_made_true():
     """
     Test when a decision is already made for the given syscall and arguments.
     """
@@ -78,13 +78,13 @@ def test_is_already_decided_true():
         arguments = ["arg1", "arg2"]
 
         # When: The is_already_decided function is called
-        result = is_already_decided(syscall_nr, arguments)
+        allow, deny = check_decision_made(syscall_nr, arguments)
 
         # Then: It should return True
-        assert result is True
+        assert allow is True
 
 
-def test_is_already_decided_false():
+def test_check_decision_made_false():
     """
     Test when no decision is made for the given syscall and arguments.
     """
@@ -95,10 +95,10 @@ def test_is_already_decided_false():
         arguments = ["arg3"]
 
         # When: The is_already_decided function is called
-        result = is_already_decided(syscall_nr, arguments)
+        allow, deny = check_decision_made(syscall_nr, arguments)
 
         # Then: It should return False
-        assert result is False
+        assert allow is False
 
 
 def test_prepare_arguments():
