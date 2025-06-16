@@ -10,6 +10,9 @@ import logging
 GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
+GROUPS_DEFAULT_QUESTION = {} 
+# Global mapping from syscall ID to group name
+SYSCALL_TO_GROUP = {}
 GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
@@ -18,73 +21,88 @@ LOGGER = logging.getLogger("User-Tool")
 def parse_file(filename):
     """
     Parse a configuration file to extract syscall groups, parameters, and arguments.
-
-    Args:
-        filename (str): Path to the configuration file.
     """
-    argument_name = None
-    argument_values = []
-    group_name = None
-    syscall_values = []
-    parameter_name = None
-    parameter_values = []
+    def flush_argument(arg_name, arg_values):
+        if arg_name and arg_values and arg_name not in ARGUMENTS:
+            ARGUMENTS[arg_name] = arg_values[:]
+
+    def flush_parameter(param_name, param_values, group_name):
+        if param_name and group_name:
+            if param_name not in PARAMETERS:
+                PARAMETERS[param_name] = param_values[:]
+                if group_name not in GROUPS_PARAMETER_ORDER:
+                    GROUPS_PARAMETER_ORDER[group_name] = []
+                GROUPS_PARAMETER_ORDER[group_name].append(param_name)
+
+    def flush_group(group_name, syscalls):
+        if group_name and syscalls and group_name not in GROUPS_SYSCALL:
+            GROUPS_SYSCALL[group_name] = syscalls[:]
+            GROUPS_ORDER.append(group_name)
+
+    argument_name, argument_values = None, []
+    parameter_name, parameter_values = None, []
+    group_name, syscall_values = None, []
+
     try:
         with open(filename, 'r', encoding="UTF-8") as file:
-            LOGGER.info("Parsing groups file: %s", filename)
             for line in file:
-                # Remove leading/trailing whitespace
                 line = line.strip()
-
-                # Skip empty lines
                 if not line:
                     continue
 
-                # Extract argument name
+                # Argument block
                 if line.startswith("a:"):
+                    flush_argument(argument_name, argument_values)
                     argument_name = line[2:].strip().split()[0]
-                # Store argument values
-                elif argument_name and line.startswith(")"):
-                    if argument_name not in ARGUMENTS:
-                        ARGUMENTS[argument_name] = argument_values
-                    argument_name = None
                     argument_values = []
-                # Add line to argument values list
+                    continue
+                elif argument_name and line.startswith(")"):
+                    flush_argument(argument_name, argument_values)
+                    argument_name, argument_values = None, []
+                    continue
                 elif argument_name:
                     argument_values.append(line)
+                    continue
 
-                match_nr = re.match(r'(\d+)', line)
-                # Extract group name
+                # Group block
                 if line.startswith("g:"):
+                    flush_group(group_name, syscall_values)
                     group_name = line[2:].strip().split()[0]
-                # Store system call values
-                elif group_name and line.startswith("}"):
-                    if group_name not in GROUPS_SYSCALL:
-                        GROUPS_SYSCALL[group_name] = syscall_values
-                        GROUPS_ORDER.append(group_name)
-                    group_name = None
                     syscall_values = []
-                # Add system call number to the list
-                elif group_name and match_nr:
-                    number = int(match_nr.group(1))
-                    syscall_values.append(number)
+                    continue
+                elif group_name and line.startswith("}"):
+                    flush_group(group_name, syscall_values)
+                    group_name, syscall_values = None, []
+                    continue
+                elif group_name and line and line[0].isdigit():
+                    syscall_values.append(int(line.split()[0]))
+                    continue
 
-                # Extract parameter name
+                # Default question for group
+                if group_name and line.startswith("d:"):
+                    GROUPS_DEFAULT_QUESTION[group_name] = line[2:].strip()
+                    continue
+
+                # Parameter block
                 if line.startswith("p:"):
-                    line = line.split('?')[0]
-                    parameter_name = line[2:].strip()
-                # Initialize parameter order list for the group
-                elif parameter_name and group_name and line.startswith("]"):
-                    if parameter_name not in PARAMETERS:
-                        if group_name not in GROUPS_PARAMETER_ORDER:
-                            GROUPS_PARAMETER_ORDER[group_name] = []
-                        PARAMETERS[parameter_name] = parameter_values
-                        GROUPS_PARAMETER_ORDER[group_name].append(
-                            parameter_name)
-                    parameter_name = None
+                    flush_parameter(parameter_name, parameter_values, group_name)
+                    parameter_name = line[2:].split('?')[0].strip()
                     parameter_values = []
-                # Add line to parameter values list
+                    continue
+                elif parameter_name and group_name and line.startswith("]"):
+                    flush_parameter(parameter_name, parameter_values, group_name)
+                    parameter_name, parameter_values = None, []
+                    continue
                 elif parameter_name:
                     parameter_values.append(line)
+                    continue
+
+        # Final flushes in case file ends without closing blocks
+        flush_argument(argument_name, argument_values)
+        flush_parameter(parameter_name, parameter_values, group_name)
+        flush_group(group_name, syscall_values)
+
+        LOGGER.debug("Group para. order: %s", GROUPS_PARAMETER_ORDER)
     except (FileNotFoundError, IOError, ValueError) as e:
         LOGGER.error("Error parsing file %s: %s", filename, e)
 
@@ -101,29 +119,54 @@ def get_question(syscall_nr, argument):
         str: The parameter question if found, otherwise -1.
     """
     for groups in GROUPS_ORDER:
+        LOGGER.debug("Processing group: %s", groups)
+        
         for syscall in GROUPS_SYSCALL[groups]:
-            # If the current system call matches the given syscall_nr
+            LOGGER.debug("Checking syscall: %s against target: %s", syscall, syscall_nr)
+            
             if syscall == syscall_nr:
-                for parameter in GROUPS_PARAMETER_ORDER[groups]:
-                    
+                LOGGER.info("Match found! Syscall %s matches target %s", syscall, syscall_nr)
+                
+                # If the group has no parameters, return the default question
+                param_order = GROUPS_PARAMETER_ORDER.get(groups, [])
+                if not param_order:
+                    default_question = GROUPS_DEFAULT_QUESTION.get(groups, -1)
+                    LOGGER.debug("No parameters for group '%s', returning default: %s", groups, default_question)
+                    return default_question
+
+                for parameter in param_order:
+                    LOGGER.debug("Processing parameter: %s", parameter)
                     parameter_values = set()
-                    # Iterate through the arguments for the current parameter
                     for arg in PARAMETERS[parameter]:
+                        LOGGER.debug("Processing argument: %s", arg)
                         key, value = arg.split("=")
                         value = value.strip()
-                        
-                        # Add entry to the parameter set
+                        LOGGER.debug("Parsed key: %s, value: %s", key, value)
                         for a in ARGUMENTS[value]:
                             parameter_values.add(a)
-                          
-                    # If the length of the given argument is not 0 and all given arguments match the parameter set
-                    if len(argument) != 0 and set(argument).issubset(parameter_values):
+                            LOGGER.debug("Added to parameter_values: %s", a)
+                    LOGGER.debug("Parameter '%s' has values: %s", parameter, parameter_values)
+                    LOGGER.debug("Checking against provided argument: %s", argument)
+                    if parameter_values and set(argument).issuperset(parameter_values):
+                        LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
+                        LOGGER.info("Returning parameter: %s", parameter)
                         return parameter
-                    # If the length of the given argument is 0 and the parameter has no arguments
                     elif len(argument) == 0 and not parameter_values:
-                        return parameter 
-    
-    # If no matching parameter is found, return -1
+                        LOGGER.info("SUCCESS: Empty argument matches empty parameter_values")
+                        LOGGER.info("Returning parameter: %s", parameter)
+                        return parameter
+                    else:
+                        if len(argument) != 0:
+                            LOGGER.warning("MISMATCH: Argument %s not subset of %s", argument, parameter_values)
+                        else:
+                            LOGGER.warning("MISMATCH: Empty argument but parameter has values: %s", parameter_values)
+                default_question = GROUPS_DEFAULT_QUESTION.get(groups, -1)
+                LOGGER.warning("No parameter matched, returning default: %s", default_question)
+                return default_question            
+            else:
+                LOGGER.debug("No match: %s != %s", syscall, syscall_nr)
+
+    LOGGER.warning("No matching parameter found across all groups")
     return -1
 
 
@@ -166,3 +209,62 @@ def argument_separator(argument_raw, argument_pretty):
                 argument_values.extend(flag_mode_values)
 
     return argument_values
+
+
+
+def parse_groups_file(filename: str) -> dict:
+    """
+    Parse the groups file and return a dict mapping group names to syscall IDs.
+    """
+    groups = {}
+    current_group = None
+    syscalls = []
+    with open(filename, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("g:"):
+                if current_group and syscalls:
+                    groups[current_group] = syscalls
+                current_group = line[2:].split("{")[0].strip()
+                syscalls = []
+            elif current_group and line and line[0].isdigit():
+                syscall_id = int(line.split()[0])
+                syscalls.append(syscall_id)
+            elif line.startswith("}"):
+                if current_group and syscalls:
+                    groups[current_group] = syscalls
+                current_group = None
+                syscalls = []
+        if current_group and syscalls:
+            groups[current_group] = syscalls
+    return groups
+
+def build_syscall_to_group_map(groups_file: str):
+    """
+    Build a global mapping from syscall ID to group name.
+    """
+    global SYSCALL_TO_GROUP
+    SYSCALL_TO_GROUP.clear()
+    group_map = parse_groups_file(groups_file)
+    for group, syscalls in group_map.items():
+        for syscall in syscalls:
+            SYSCALL_TO_GROUP[syscall] = group
+
+def get_group_for_syscall(syscall_id: int):
+    """
+    Return the group name for a given syscall ID, or None if not found.
+    """
+    return SYSCALL_TO_GROUP.get(syscall_id)
+
+def get_groups_structure(filename: str) -> dict:
+    """
+    Return a dict mapping group names to syscall IDs.
+    """
+    return parse_groups_file(filename)
+
+def get_syscalls_for_group(group_name: str, groups_file: str = "user_tool/groups"):
+    """
+    Return a list of syscall IDs for a given group name.
+    """
+    groups = parse_groups_file(groups_file)
+    return groups.get(group_name, [])

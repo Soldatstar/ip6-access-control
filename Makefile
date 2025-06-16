@@ -6,6 +6,9 @@ ACTIVATE_LINUX = source $(VENV_DIR)/bin/activate
 SHELL := /bin/bash
 DEMOPROGRAM = demo/file-access
 DEMOCPROGRAM = demo/file-access.c
+DEMONORMALFILES = demo/normal-file
+DEMOCNORMALFILES = demo/normal-file.c
+
 SUPERVISOR_DIR = supervisor
 USER_TOOL_DIR = user_tool
 TEST_DIR = tests
@@ -17,6 +20,7 @@ help:
 	@echo "  make delete: Löscht das virtuelle Environment."
 	@echo "  make run: Aktiviert das virtuelle Environment und führt supervisor.py aus (Linux)."
 	@echo "  make ut: Aktiviert das virtuelle Environment und führt user_tool.py aus (Linux)."
+	@echo "  make utv: Aktiviert das virtuelle Environment und führt user_tool.py im Debug-Modus aus (Linux)."
 	@echo "  make test: Aktiviert das virtuelle Environment und führt die Tests aus (Linux)."
 	@echo "  make pylint: Aktiviert das virtuelle Environment und führt pylint aus (Linux)."
 	@echo "  make build: Aktiviert das virtuelle Environment und erstellt das Projekt (Linux)."
@@ -26,11 +30,13 @@ create:
 	$(ACTIVATE_LINUX)
 	$(PIP) install -r requirements.txt
 	gcc $(DEMOCPROGRAM) -o $(DEMOPROGRAM)
+	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
 
 # Ziel zum Löschen des virtuellen Environments
 delete:
 	rm -rf $(VENV_DIR)
 	-rm -f $(DEMOPROGRAM)
+	-rm -f $(DEMONORMALFILES)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
 	rm -rf supervisor/__pycache__/
@@ -49,8 +55,14 @@ delete:
 run: 
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM)
 
+run2: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	
+
 ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py
+
+utv:
+	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py --debug
 
 test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
@@ -60,4 +72,8 @@ pylint:
 	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py') 
 build:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m build
+runv: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM) --debug 
+run2v:
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py  $(DEMONORMALFILES)	--debug
 .PHONY: help create delete run

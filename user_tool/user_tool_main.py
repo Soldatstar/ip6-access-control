@@ -16,17 +16,21 @@ import hashlib
 import sys
 from pathlib import Path
 import zmq
+import logging
+import argparse
 
 # Add the parent directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from user_tool import policy_manager
 from user_tool import user_interaction
+from user_tool import group_selector
 from shared import conf_utils
 from user_tool.policy_manager import Policy
 
 # Directories
 POLICIES_DIR, LOGS_DIR, LOGGER = conf_utils.setup_directories("user_tool.log", "User-Tool")
+LOGGER.propagate = False  # Prevent double logging
 
 # Global variables
 REQUEST_QUEUE = queue.Queue()
@@ -99,6 +103,9 @@ def handle_requests():
                 POLICIES_DIR, program_hash, "policy.json")
 
             response = None
+            # Read all group names from the groups file
+            all_groups = set(group_selector.get_groups_structure("user_tool/groups").keys())
+
             if os.path.exists(policy_file) and os.path.getsize(policy_file) > 0:
                 with open(policy_file, "r", encoding="UTF-8") as file:
                     try:
@@ -106,6 +113,28 @@ def handle_requests():
                         LOGGER.debug("Policy for %s: %s",
                                      program_hash, json.dumps(data, indent=4))
                         rules = data.get("rules", {})
+                        default_policy_path = os.path.join(
+                            Path(__file__).resolve().parent, "default.json")
+                        with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+                            default_data = json.load(default_file)
+                            default_syscalls = default_data.get("rules", {}).get("allowed_syscalls", [])
+                            rules["allowed_syscalls"] = default_syscalls + rules.get("allowed_syscalls", [])
+                        rules["denied_syscalls"] = rules.get("denied_syscalls", [])
+                        # Determine blacklist
+                        allowed_groups = set(rules.get("allowed_groups", []))
+                        if not allowed_groups:
+                            # No allowed_groups: blacklist all groups
+                            blacklisted_groups = all_groups
+                        else:
+                            # Blacklist = all groups - allowed_groups
+                            blacklisted_groups = all_groups - allowed_groups
+
+                        # Expand to syscall IDs
+                        blacklisted_ids = []
+                        for group in blacklisted_groups:
+                            blacklisted_ids.extend(group_selector.get_syscalls_for_group(group))
+                        rules["blacklisted_ids"] = sorted(set(blacklisted_ids))
+
                         response = {
                             "status": "success",
                             "data": rules
@@ -119,10 +148,22 @@ def handle_requests():
                         }
             else:
                 LOGGER.info("No policy found for %s", program_hash)
-                response = {
-                    "status": "error",
-                    "data": {"message": "No policy found"}
-                }
+                # Load default policy
+                default_policy_path = os.path.join(
+                    Path(__file__).resolve().parent, "default.json")
+                with open(default_policy_path, "r", encoding="UTF-8") as default_file:
+                    default_data = json.load(default_file)
+                    rules = default_data.get("rules", {})
+                    # Blacklist all groups if no policy
+                    blacklisted_groups = all_groups
+                    blacklisted_ids = []
+                    for group in blacklisted_groups:
+                        blacklisted_ids.extend(group_selector.get_syscalls_for_group(group))
+                    rules["blacklisted_ids"] = sorted(set(blacklisted_ids))
+                    response = {
+                        "status": "success",
+                        "data": rules
+                    }
             socket.send_multipart(
                 [identity, b'', json.dumps(response).encode()])
             continue
@@ -138,7 +179,7 @@ def handle_requests():
             continue
         LOGGER.info("Handling request for %s (hash: %s)",
                     program_name, program_hash)
-        LOGGER.info("Syscall: %s (ID: %s parameter: %s)",
+        LOGGER.debug("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
         response = user_interaction.ask_permission(
             syscall_nr, program_name, program_hash, parameter_formated, parameter)
@@ -155,7 +196,43 @@ def handle_requests():
                 policy = Policy(
                     program_path, program_hash, syscall_nr, "ALLOW", "placeholder_user", parameter
                 )
+                group = group_selector.get_group_for_syscall(syscall_nr)
+                policy_manager.save_decision(policy, allowed_group=group)
+                allowed_ids = group_selector.get_syscalls_for_group(group)
+                ######
+                # TODO: Currently all Syscalls in a group will be removed from the blacklist except FileAccess
+                #if group == "FileAccess": 
+                #    allowed_ids = []
+                ######
+
+                success_response = {
+                    "status": "success",
+                    "data": {
+                        "decision": response,
+                        "allowed_ids": allowed_ids
+                    }
+                }
+                socket.send_multipart(
+                    [identity, b'', json.dumps(success_response).encode()])
+                continue
+            case "ALLOW_THIS":
+                LOGGER.info("User allowed only this syscall/parameter for %s (hash: %s)",
+                            program_name, program_hash)
+                policy = Policy(
+                    program_path, program_hash, syscall_nr, "ALLOW", "placeholder_user", parameter
+                )
                 policy_manager.save_decision(policy)
+                # Only allow this syscall with this parameter
+                success_response = {
+                    "status": "success",
+                    "data": {
+                        "decision": response,
+                        "allowed_ids": []
+                    }
+                }
+                socket.send_multipart(
+                    [identity, b'', json.dumps(success_response).encode()])
+                continue
             case "DENY":
                 LOGGER.info("User denied the request for %s (hash: %s)",
                             program_name, program_hash)
@@ -178,7 +255,7 @@ def handle_requests():
     NEW_REQUEST_EVENT.clear()  # Clear the event after handling all requests
 
 
-def main(test_mode=False):
+def main(test_mode=False, debug=False):
     """
     Main entry point for the User Tool.
 
@@ -187,10 +264,23 @@ def main(test_mode=False):
 
     Args:
         test_mode (bool): If True, the function will exit after one iteration of the loop.
+        debug (bool): If True, sets logging to DEBUG level.
     """
+    if debug:
+        LOGGER.setLevel("DEBUG")
+        LOGGER.info("Debug mode is enabled. Logging level set to DEBUG.")
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
+    group_selector.build_syscall_to_group_map("user_tool/groups")
+    # LOGGER.info("SYSCALL_TO_GROUP mapping: %s", group_selector.SYSCALL_TO_GROUP)
+    # LOGGER.info("Groups structure: %s", group_selector.get_groups_structure("user_tool/groups"))
+    # syscall_id = 132
+    # group = group_selector.get_group_for_syscall(syscall_id)
+    # LOGGER.info("Syscall %d belongs to group: %s", syscall_id, group)
+    # group_name = "FileTimestamp"
+    # ids = group_selector.get_syscalls_for_group(group_name)
+    # LOGGER.info("Syscall IDs for group %s: %s", group_name, ids)
 
     while True:
         LOGGER.info("User Tool Menu:")
@@ -231,4 +321,15 @@ def main(test_mode=False):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="User Tool Main")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--test", action="store_true", help="Enable test mode")
+    args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=log_level)
+    LOGGER.setLevel(log_level)
+    for handler in LOGGER.handlers:
+        handler.setLevel(log_level)    
+
+    main(test_mode=args.test, debug=args.debug)
