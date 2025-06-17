@@ -7,7 +7,9 @@ The module also supports seccomp for syscall filtering and shared lists for mana
 """
 
 import zmq
+import traceback
 import json
+import time
 from sys import stderr, argv, exit
 from os import execv, path, kill, getpid
 from signal import SIGKILL, SIGUSR1
@@ -174,6 +176,7 @@ def init_shared_list(socket):
         }
     }
     LOGGER.info("Initializing shared list with program path: %s", PROGRAM_ABSOLUTE_PATH)
+    LOGGER.debug("Sending message to user tool: %s", message)
     socket.send_multipart([b'', json.dumps(message).encode()])
     while True:
         _, response = socket.recv_multipart()
@@ -331,8 +334,6 @@ def handle_syscall_event(event, process, socket):
     process.syscall()
 
 
-import traceback
-from ptrace.debugger import PtraceDebugger, ProcessExit, NewProcessEvent, ProcessSignal
 
 def main():
     """
@@ -363,6 +364,10 @@ def main():
     process.cont()
     event = process.waitSignals(SIGUSR1)
     process.syscall()
+    
+    # Start timing the child execution
+    start_time = time.time()
+    LOGGER.info("Child process execution started at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
 
     running = True
     LOGGER.debug("Starting main loop to monitor syscalls")
@@ -387,18 +392,30 @@ def main():
             continue
 
         except ProcessExit:
+            # Record end time and calculate duration
+            end_time = time.time()
+            execution_duration = end_time - start_time
             LOGGER.info("***PROCESS-EXECUTED***")
+            LOGGER.info("Child process execution ended at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
+            LOGGER.info("Total execution time: %.3f seconds", execution_duration)
             break
 
         except KeyboardInterrupt:
+             # Record end time for interrupted execution
+             end_time = time.time()
+             execution_duration = end_time - start_time
              LOGGER.info("Exiting supervisor...")
+             LOGGER.info("Child process execution interrupted after %.3f seconds", execution_duration)
              break
 
         except Exception as e:
+             # Record end time for error cases
+             end_time = time.time()
+             execution_duration = end_time - start_time
              LOGGER.error("Exception in main loop: %s", e)
              LOGGER.debug("Traceback: %s", traceback.format_exc())
+             LOGGER.info("Child process execution stopped due to error after %.3f seconds", execution_duration)
              break
-
 
     # Cleanup
     debugger.quit()
