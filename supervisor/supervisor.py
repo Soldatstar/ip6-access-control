@@ -252,15 +252,18 @@ def prepare_arguments(syscall_args):
     """
     arguments = []
     for arg in syscall_args:
-        match arg.name:
-            case "filename":
-                arguments.append(arg.format())
-            case "flags":
-                arguments.append(arg.value)
-            case "mode":
-                arguments.append(arg.value)
-            case _:
-                arguments.append("*")
+        if any(not char.isdigit() for char in arg.format()):
+            match arg.name:
+                case "filename":
+                    arguments.append(arg.format())
+                case "flags":
+                    arguments.append(arg.value)
+                case "mode":
+                    arguments.append(arg.value)
+                case _:
+                    arguments.append("*")
+        else: 
+            arguments.append("*")
     return arguments
 
 
@@ -300,11 +303,12 @@ def handle_syscall_event(event, process, socket):
                 socket=socket
             )
 
-            if decision["decision"] == "ALLOW":
+            if decision["decision"] == "ALLOW_THIS":
                 LOGGER.info("Decision: ALLOW Syscall: %s", syscall.format())
                 size_before = len(SYSCALL_ID_SET)
                 LOGGER.debug("Updated ALLOW set with: %s", combined_tuple)
                 ALLOW_SET.add(combined_tuple)
+                LOGGER.debug("ALLOW set after update: %s", ALLOW_SET)
                 for sid in decision.get("allowed_ids", []):
                     SYSCALL_ID_SET.discard(sid)
                 LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
@@ -312,6 +316,7 @@ def handle_syscall_event(event, process, socket):
             if decision["decision"] == "DENY":
                 LOGGER.debug("Updated DENY set with: %s", combined_tuple)
                 DENY_SET.add(combined_tuple)
+                LOGGER.debug("DENY set after update: %s", DENY_SET)
                 LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
                 process.setreg('orig_rax', -EPERM)
                 process.syscall()

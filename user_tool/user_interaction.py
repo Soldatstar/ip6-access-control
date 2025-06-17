@@ -9,7 +9,7 @@ from user_tool import group_selector
 # Configuration file for the syscall conversion with parameters for the appropriate question.
 GROUP_FILE = "user_tool/groups"
 LOGGER = logging.getLogger("User-Tool")
-def ask_permission(syscall_nr, program_name, program_hash,
+def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
                    parameter_formated, parameter_raw):
 
     # Prepare question text
@@ -53,6 +53,16 @@ def ask_permission(syscall_nr, program_name, program_hash,
         if choice:
             set_decision(choice)
 
+    # Build text
+    text = (
+        f"{question}?\n\n"
+        f"Program: {program_name}\n"
+        f"Systemcall: {syscall_name}\n"
+    )
+
+    if args:
+        text += f"Parameter: {', '.join(args)}\n"
+        
     # Build the GUI
     root = tk.Tk()
     root.title("Permission Request")
@@ -61,11 +71,7 @@ def ask_permission(syscall_nr, program_name, program_hash,
 
     tk.Label(
         root,
-        text=(
-            f"{question}?\n"
-            f"Program: {program_name}\n"
-            f"Parameter: {parameter_formated}"
-        ),
+        text=text,
         wraplength=width-50
     ).pack(pady=20)
 
@@ -86,13 +92,9 @@ def ask_permission(syscall_nr, program_name, program_hash,
     root.createfilehandler(sys.stdin, tk.READABLE, on_stdin)
 
     # Run until either a button or stdin choice destroys root
-
-    prompt = (
-        f"{question}?\n"
-        f"    Program: {program_name}\n"
-        f"    Parameter: {parameter_formated}\n"
-        "    (y)es / (t)his / (n)o / (o)ne: "
-    )
+    text += "    (y)es / (t)his / (n)o / (o)ne: "
+    
+    prompt = text
     print(prompt, end="", flush=True)
 
     root.mainloop()
