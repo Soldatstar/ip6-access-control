@@ -56,17 +56,32 @@ def init_seccomp(deny_list):
     for deny_decision in deny_list:
         syscall_nr = deny_decision[0]
         LOGGER.debug("Processing deny decision for syscall_nr: %s", syscall_nr)
-        for i in range(len(deny_decision[1:])):
-            try:
-                # TODO: Look at seccomp how path to files are handled
-                if not isinstance(deny_decision[1:][i], str):
-                    LOGGER.debug("Adding rule for syscall_nr: %s, Argument: %s",
-                                 syscall_nr, deny_decision[1:][i])
-                    sys_filter.add_rule(TRAP, syscall_nr, Arg(
-                        i, EQ, deny_decision[1:][i]))
-            except TypeError as e:
-                LOGGER.warning("TypeError: %s - For syscall_nr: %s, Argument: %s",
-                               e, syscall_nr, deny_decision[1:][i])
+        
+        try:
+            args = []
+            no_str = True
+            for i in range(len(deny_decision[1:])):
+                if isinstance(deny_decision[1:][i], str):
+                    if deny_decision[1:][i] == "*":
+                        LOGGER.debug("Ignore parameter for seccomp rule syscall_nr: %s, argument: %s at position: %s",
+                                 syscall_nr, deny_decision[1:][i], i)
+                        continue
+                    else: 
+                        no_str = False
+                        LOGGER.debug("Stop prepare rule because of string for syscall_nr: %s, argument: %s at position: %s",
+                                 syscall_nr, deny_decision[1:][i], i)
+                        break
+                LOGGER.debug("Prepare rule with parameter for syscall_nr: %s, argument: %s at position: %s",
+                                 syscall_nr, deny_decision[1:][i], i)
+                args.append(Arg(i, EQ, deny_decision[1:][i]))
+            if no_str:
+                LOGGER.debug("Add rule for syscall_nr: %s, arguments: %s",
+                                 syscall_nr, args)
+                sys_filter.add_rule(TRAP, syscall_nr, *args)
+        except TypeError as e:
+                LOGGER.warning("TypeError: %s - For syscall_nr: %s, argument: %s at position: %s",
+                               e, syscall_nr, deny_decision[1:][i], i)
+
     LOGGER.info("Seccomp filter initialized with deny list: %s", deny_list)
     # Load the seccomp filter
     LOGGER.info("Loading seccomp filter")
@@ -190,7 +205,7 @@ def init_shared_list(socket):
             break
 
 
-def is_already_decided(syscall_nr, arguments):
+def check_decision_made(syscall_nr, arguments):
     """
     Check if a decision has already been made for a syscall and its arguments.
 
@@ -199,19 +214,30 @@ def is_already_decided(syscall_nr, arguments):
         arguments (list): Arguments of the syscall.
 
     Returns:
-        bool: True if the decision is already made, False otherwise.
+        tuple: (bool, bool) - The first bool indicates if the allow decision is already made, 
+                              the second bool indicates if the deny decision is already made
     """
     key = tuple([syscall_nr] + arguments)
     # Fast O(1) check
-    if key in ALLOW_SET or key in DENY_SET:
-        return True
+    if key in ALLOW_SET:
+        return True, False
+
+    if key in DENY_SET:
+        return False, True
+
     # Wildcard support: check for any tuple with "*" in place of any argument
     # (e.g., (nr, "*", ...)), but only if needed
-    for allow_key in ALLOW_SET.union(DENY_SET):
+    for allow_key in ALLOW_SET:
         if allow_key[0] == syscall_nr and len(allow_key) == len(key):
             if all(a == "*" or a == b for a, b in zip(allow_key[1:], key[1:])):
-                return True
-    return False
+                return True, False
+    
+    for deny_key in DENY_SET:
+        if deny_key[0] == syscall_nr and len(deny_key) == len(key):
+            if all(a == "*" or a == b for a, b in zip(deny_key[1:], key[1:])):
+                return False, True
+
+    return False, False
 
 
 def prepare_arguments(syscall_args):
@@ -262,8 +288,9 @@ def handle_syscall_event(event, process, socket):
         syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
         combined_tuple = tuple([syscall_number] + syscall_args)
         LOGGER.info("Catching new syscall: %s", syscall.format())
-
-        if not is_already_decided(syscall_nr=syscall_number, arguments=syscall_args):
+        decided_to_allow, decided_to_deny = check_decision_made(syscall_nr=syscall_number, arguments=syscall_args)
+        
+        if not decided_to_allow and not decided_to_deny:
             decision = ask_for_permission_zmq(
                 syscall_name=syscall.name,
                 syscall_nr=syscall_number,
@@ -275,20 +302,32 @@ def handle_syscall_event(event, process, socket):
             if decision["decision"] == "ALLOW":
                 LOGGER.info("Decision: ALLOW Syscall: %s", syscall.format())
                 size_before = len(SYSCALL_ID_SET)
+                LOGGER.debug("Updated ALLOW set with: %s", combined_tuple)
                 ALLOW_SET.add(combined_tuple)
                 for sid in decision.get("allowed_ids", []):
                     SYSCALL_ID_SET.discard(sid)
                 LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
                 LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
             if decision["decision"] == "DENY":
-                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
+                LOGGER.debug("Updated DENY set with: %s", combined_tuple)
                 DENY_SET.add(combined_tuple)
+                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
                 process.setreg('orig_rax', -EPERM)
                 process.syscall()
                 event.process.debugger.waitSyscall()
                 process.setreg('rax', -EPERM)
+        elif decided_to_deny:
+            if any(isinstance(arg, str) and arg != "*" for arg in syscall_args):
+                LOGGER.debug("Syscall: %s has a string parameter and must be denied without seccomp", syscall_args)
+                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
+                process.setreg('orig_rax', -EPERM)
+                process.syscall()
+                event.process.debugger.waitSyscall()
+                process.setreg('rax', -EPERM)
+            else:
+                LOGGER.debug("Syscall %s has no string parameters and will be denied by seccomp", syscall.format())
         else:
-            LOGGER.debug("Decision for syscall: %s was already decided", syscall.format())
+            LOGGER.debug("Syscall %s was already allowed", syscall.format())
     process.syscall()
 
 

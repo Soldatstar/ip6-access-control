@@ -8,7 +8,7 @@ This module contains unit tests for the following functionalities:
 import json
 import os
 from unittest.mock import MagicMock, patch, ANY
-from supervisor.supervisor import ask_for_permission_zmq, is_already_decided, prepare_arguments, setup_zmq, init_shared_list
+from supervisor.supervisor import ask_for_permission_zmq, check_decision_made, prepare_arguments, setup_zmq, init_shared_list
 
 
 def test_ask_for_permission_zmq():
@@ -56,32 +56,71 @@ def test_ask_for_permission_zmq():
     )
 
 
-def test_is_already_decided_true():
-    # Given
+def test_check_decision_made_true_allow():
+    """
+    Test when a decision is already made for the given syscall and arguments.
+    """
+    # Given: Mocked ALLOW_SET and DENY_SET with a matching decision
     with patch("supervisor.supervisor.ALLOW_SET", {(2, "arg1", "arg2")}), \
          patch("supervisor.supervisor.DENY_SET", set()):
         syscall_nr = 2
         arguments = ["arg1", "arg2"]
 
-        # When
-        result = is_already_decided(syscall_nr, arguments)
+        # When: The is_already_decided function is called
+        allow, deny = check_decision_made(syscall_nr, arguments)
 
-    # Then
-    assert result is True
+        # Then: It should return True
+        assert allow is True
 
 
-def test_is_already_decided_false():
-    # Given
+def test_check_decision_made_false_allow():
+    """
+    Test when no decision is made for the given syscall and arguments.
+    """
+    # Given: Mocked ALLOW_SET and DENY_SET without a matching decision
     with patch("supervisor.supervisor.ALLOW_SET", {(2, "arg1", "arg2")}), \
          patch("supervisor.supervisor.DENY_SET", {(3, "arg3")}):
         syscall_nr = 2
         arguments = ["arg3"]
 
-        # When
-        result = is_already_decided(syscall_nr, arguments)
+        # When: The is_already_decided function is called
+        allow, deny = check_decision_made(syscall_nr, arguments)
 
-    # Then
-    assert result is False
+        # Then: It should return False
+        assert allow is False
+
+def test_check_decision_made_true_deny():
+    """
+    Test when a decision is already made for the given syscall and arguments.
+    """
+    # Given: Mocked ALLOW_SET and DENY_SET with a matching decision
+    with patch("supervisor.supervisor.ALLOW_SET", set()), \
+         patch("supervisor.supervisor.DENY_SET", {(2, "arg1", "arg2")}):
+        syscall_nr = 2
+        arguments = ["arg1", "arg2"]
+
+        # When: The is_already_decided function is called
+        allow, deny = check_decision_made(syscall_nr, arguments)
+
+        # Then: It should return True
+        assert deny is True
+
+
+def test_check_decision_made_false_deny():
+    """
+    Test when no decision is made for the given syscall and arguments.
+    """
+    # Given: Mocked ALLOW_SET and DENY_SET without a matching decision
+    with patch("supervisor.supervisor.ALLOW_SET", {(2, "arg1", "arg2")}), \
+         patch("supervisor.supervisor.DENY_SET", {(3, "arg3")}):
+        syscall_nr = 2
+        arguments = ["arg3"]
+
+        # When: The is_already_decided function is called
+        allow, deny = check_decision_made(syscall_nr, arguments)
+
+        # Then: It should return False
+        assert deny is False
 
 
 def test_prepare_arguments():
