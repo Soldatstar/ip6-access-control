@@ -20,7 +20,7 @@ import logging
 from ptrace.debugger import (
     PtraceDebugger, ProcessExit, NewProcessEvent, ProcessSignal)
 from ptrace.func_call import FunctionCallOptions
-from pyseccomp import SyscallFilter, ALLOW, TRAP, Arg, EQ
+from pyseccomp import SyscallFilter, ALLOW, ERRNO, Arg, EQ
 
 # Add the parent directory to sys.path
 import sys
@@ -77,7 +77,7 @@ def init_seccomp(deny_list):
             if no_str:
                 LOGGER.debug("Add rule for syscall_nr: %s, arguments: %s",
                                  syscall_nr, args)
-                sys_filter.add_rule(TRAP, syscall_nr, *args)
+                sys_filter.add_rule(ERRNO(EPERM), syscall_nr, *args)
         except TypeError as e:
                 LOGGER.warning("TypeError: %s - For syscall_nr: %s, argument: %s at position: %s",
                                e, syscall_nr, deny_decision[1:][i], i)
