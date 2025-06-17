@@ -142,8 +142,8 @@ def test_prepare_arguments():
     mock_syscall_args = [
         type("MockArg", (object,), {
              "name": "filename", "format": lambda: "/path/to/file"}),
-        type("MockArg", (object,), {"name": "flags", "value": "O_RDONLY"}),
-        type("MockArg", (object,), {"name": "mode", "value": "0777"}),
+        type("MockArg", (object,), {"name": "flags", "value": "O_RDONLY", "format": lambda: "*"}),
+        type("MockArg", (object,), {"name": "mode", "value": "0777", "format": lambda: "*"}),
         type("MockArg", (object,), {"name": "unknown", "format": lambda: "*"})
     ]
 
