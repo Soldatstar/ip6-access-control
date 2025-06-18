@@ -72,3 +72,9 @@ g: MessageQueueCommunication {
   68 msgget(key_t key, int msgflg)
   240 mqd_t mq_open(const char *name, int oflag)
 }
+
+g: SharedMemoryCommunication {
+  d: Do you allow communication using shared memory
+  
+  29 shmget(key_t key, size_t size, int shmflg)
+}

@@ -9,7 +9,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <mqueue.h>
-
+#include <sys/shm.h>
 
 
 void sys_pipe() {
@@ -67,8 +67,10 @@ void sys_msgget(const char *pathname, int proj_id, int msgflg, const char *desc)
         printf("msgget(%s) error: %m\n", desc);
     } else {
         printf("msgget(%s) created: [%d]\n", desc, msgid);
+        msgctl(msgid, IPC_RMID, NULL);
     }
 }
+
 
 void sys_mq_open(const char *name, int oflag, const char *desc) {
     mqd_t mqd = mq_open(name, oflag, 0666, NULL);
@@ -80,6 +82,23 @@ void sys_mq_open(const char *name, int oflag, const char *desc) {
         mq_unlink(name);
     }
 }
+
+void sys_shmget(const char *pathname, int proj_id, int shmflg, size_t size, const char *desc) {
+    key_t key = ftok(pathname, proj_id);
+    if (key == -1) {
+        printf("ftok(%s, %d) error: %m\n", pathname, proj_id);
+        return;
+    }
+
+    int shmid = shmget(key, size, shmflg);
+    if (shmid == -1) {
+        printf("shmget(%s) error: %m\n", desc);
+    } else {
+        printf("shmget(%s) created: [%d]\n", desc, shmid);
+        shmctl(shmid, IPC_RMID, NULL);
+    }
+}
+
 
 int main() {
     sys_pipe();
@@ -98,7 +117,7 @@ int main() {
     sys_mq_open("/queue", O_CREAT | O_RDONLY, "O_CREAT | O_RDONLY");
     sys_mq_open("/queue", O_CREAT | O_RDWR, "O_CREAT | O_RDWR");
 
-    
+    sys_shmget("/tmp", 65, IPC_CREAT | 0666, 1024, "IPC_CREAT | 0666");
 
     return 0;
 }
