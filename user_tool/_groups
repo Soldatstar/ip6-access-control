@@ -7,204 +7,74 @@
 # - Once all arguments for a system call hit, the question is thrown.
 # - Values for parameter must be declared as arguments and assigned using "=".
 
-# Arguments for file opening modes and flags
-a: read-flags (
-    O_RDONLY
+# --- Arguments Communication ---
+
+a: socket-domain-internet (
+  AF_INET
+  AF_INET6
 )
 
-a: read-write-create-flags (
-    O_RDWR
-    O_CREAT
-)
-a: read-write-flags (
-    O_RDWR
+a: socket-domain-intern (
+  AF_UNIX
+  AF_FILE
+  AF_NETLINK
 )
 
-a: write-flags (
-    O_WRONLY
-    O_CREAT
+a: socket-type-tcp (
+  SOCK_STREAM
 )
 
-a: create-flags (
-    O_CREAT
-    O_TRUNC
-    O_CLOEXEC
+a: socket-type-udp (
+  SOCK_DGRAM
 )
 
-# Arguments for directories
-a: etc-directories (
-    /etc/ld.so.cache
-    /etc/passwd
-    /etc/group
-    /etc/hosts
-    /etc/resolv.conf
+a: socket-type-any (
+  SOCK_STREAM 
+  SOCK_DGRAM
+  SOCK_RAW
 )
-
-a: lib-directories (
-    /lib/x86_64-linux-gnu/
-    /lib64/
-    /usr/lib/
-)
-
-a: critical-files (
-    demo/file
-    /tmp/important
-    /var/log/critical
-)
-
-# Arguments for link/unlink/chown flags
-a: linkat-flags (
-    AT_EMPTY_PATH
-    AT_SYMLINK_FOLLOW
-)
-
-a: unlinkat-flags (
-    AT_REMOVEDIR
-)
-
-a: fchownat-flags (
-    AT_EMPTY_PATH
-    AT_SYMLINK_NOFOLLOW
-)
-
-# Arguments for extended attribute flags
-a: xattr-flags (
-    XATTR_CREATE
-    XATTR_REPLACE
-)
-
-
-
-# --- Groupings for System Calls ---
-
-g: FileAccess {
-    d: Do you want to allow file access operations
-
-    257 openat(int dirfd, const char *pathname, int flags, ... /* mode_t mode */)
-    0 read(int fd, void buf[.count], size_t count)
-    17 pread(int fd, void buf[.count], size_t count, off_t offset)
-
-
-
-    p: Do you want to enable reading files in /etc? [
-        pathname = etc-directories
-        flags = read-flags
-    ]
-
-    p: Do you want to enable reading files in /lib? [
-        pathname = lib-directories
-        flags = read-flags
-    ]
-
-    p: Do you want to allow opening critical files? [
-        pathname = critical-files
-        flags = read-flags
-    ]
-
-    p: Do you want to allow the program to create new files or open existing ones for modification? [
-        flags = read-write-create-flags
-    ]
-
-    p: Do you want to allow the reading of files? [
-        flags = read-flags
-    ]    
- 
-    p: Do you want to allow the editing of files? [
-        flags = read-write-flags
-    ]  
-
-    p: Do you want to allow the (over)writing of files? [
-        flags = write-flags
-    ]   
-
-    p: Do you want to allow the creation of files? [
-        flags = create-flags
-    ]   
-
-    p: Do you want to enable reading if file descriptor is available? [
-
-    ]
-}
-
-g: FileOpenCreate {
-    d: Do you want to allow file opening or creation
-    2 open(const char *pathname, int flags, ... /* mode_t mode */)
-    85 creat(const char *pathname, mode_t mode)
-
-    p: Do you want to allow files to be opened for writing or modification? [
-        flags = write-flags
-    ]
-
-    p: Do you want to allow new files to be created or existing ones truncated? [
-        flags = create-flags
-    ]
-}
-
-g: FileSystemLinks {
-    d: Do you allow the creation, deletion, or modification of file links (hard or symbolic)
-    86 link(const char *oldpath, const char *newpath)
-    87 unlink(const char *pathname)
-    88 symlink(const char *target, const char *linkpath)
-    263 unlinkat(int dirfd, const char *pathname, int flags)
-    265 linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags)
-    266 symlinkat(const char *target, int newdirfd, const char *linkpath)
-    
-}
-
-g: FileSystemNodeManagementCreate {
-    d: Do you allow the creation of directories and special files
-    83 mkdir(const char *pathname, mode_t mode)
-    84 rmdir(const char *pathname)
-    133 mknod(const char *pathname, mode_t mode, dev_t dev)
-    258 mkdirat(int dirfd, const char *pathname, mode_t mode)
-    259 mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev)
-}
-
-g: FileSystemNodeManagementDelete {
-    d: Do you allow the removal of a directory 
-    84 rmdir(const char *pathname)
-}
-
-g: FilePermissions {
-    d: Do you allow changing file permissions, ownership, or the file mode creation mask
-    90 chmod(const char *pathname, mode_t mode)
-    91 fchmod(int fd, mode_t mode)
-    92 chown(const char *pathname, uid_t owner, gid_t group)
-    93 fchown(int fd, uid_t owner, gid_t group)
-    94 lchown(const char *pathname, uid_t owner, gid_t group)
-    95 umask(mode_t mask)
-    260 fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
-    268 fchmodat(int dirfd, const char *pathname, mode_t mode, int flags)
-}
-
-g: FileTimestamp {
-    d: Do you allow changing file access and modification timestamps
-    132 utime(const char *filename, const struct utimbuf *_Nullable times)
-    235 utimes(const char *filename, const struct timeval times[_Nullable 2])
-    280 utimensat(int dirfd, const char *pathname, const struct timespec times[_Nullable 2], int flags)
-}
-
-g: FileTruncation {
-    d: Do you allow changing the size of a file by truncating it
-    76 truncate(const char *path, off_t length)
-    77 ftruncate(int fd, off_t length)
-}
-
-g: FileExtendedAttributes {
-    d: Do you want to allow setting or removing extended attributes for files
-    188 setxattr(const char *path, const char *name, const void value[.size], size_t size, int flags)
-    189 lsetxattr(const char *path, const char *name, const void value[.size], size_t size, int flags)
-    190 fsetxattr(int fd, const char *name, const void value[.size], size_t size, int flags)
-    197 removexattr(const char *path, const char *name)
-    198 lremovexattr(const char *path, const char *name)
-    199 fremovexattr(int fd, const char *name)
-}
 
 # --- Grouping Communication ---
 
 g: PipeCommunication {
-  d: Do you allow communication between processes using pipes?
+  d: Do you allow communication between processes using pipes
   
   22 pipe(int pipefd[2])
   293 pipe2(int pipefd[2], int flags)
+}
+
+g: SocketCommunication {
+  d: Do you allow communication using sockets
+
+  41 socket(int domain, int type, int protocol)
+  53 socketpair(int domain, int type, int protocol, int sv[2])
+
+  p: Do you allow communication over the internet, connection-oriented?? [
+    domain = socket-domain-internet
+    type = socket-type-tcp
+  ]
+
+  p: Do you allow communication over the internet, connectionless? [
+    domain = socket-domain-internet
+    type = socket-type-udp
+  ]
+
+  p: Do you allow local communication using sockets? [
+    domain = socket-domain-intern
+    type = socket-type-any
+  ]
+
+}
+
+g: MessageQueueCommunication {
+  d: Do you allow communication using message queue
+
+  68 msgget(key_t key, int msgflg)
+  240 mqd_t mq_open(const char *name, int oflag)
+}
+
+g: SharedMemoryCommunication {
+  d: Do you allow communication using shared memory
+  
+  29 shmget(key_t key, size_t size, int shmflg)
 }
