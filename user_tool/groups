@@ -3,10 +3,9 @@
 # - Parameters are allowed only within groups and are specified with "p:" and "[]" brackets.
 # - Each group starts with the system call number on each line and are specified with "g:" and "{}" brackets.
 # - Parameters are asked sequentially, they need to end with "?".
-# - each grouping can use a default questions for when no match occurs. specified with "d:"
-# Once all arguments for a system call hit, the question is thrown.
-# - If a parameter is not explicitly provided, all values for the parameter are implicitly assumed.
-# - Values for parameter must be declared as arguments and assigned using "="
+# - Each grouping can use a default questions for when no match occurs, specified with "d:".
+# - Once all arguments for a system call hit, the question is thrown.
+# - Values for parameter must be declared as arguments and assigned using "=".
 
 # Arguments for file opening modes and flags
 a: read-flags (
@@ -199,4 +198,13 @@ g: FileExtendedAttributes {
     197 removexattr(const char *path, const char *name)
     198 lremovexattr(const char *path, const char *name)
     199 fremovexattr(int fd, const char *name)
+}
+
+# --- Grouping Communication ---
+
+g: PipeCommunication {
+  d: Do you allow communication between processes using pipes?
+  
+  22 pipe(int pipefd[2])
+  293 pipe2(int pipefd[2], int flags)
 }

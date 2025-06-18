@@ -182,7 +182,7 @@ def handle_requests():
         LOGGER.debug("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
         response = user_interaction.ask_permission(
-            syscall_nr, program_name, program_hash, parameter_formated, parameter)
+            syscall_nr, syscall_name, program_name, program_hash, parameter_formated, parameter)
 
         match response:
             case "ONE_TIME":  # Allow for one time without saving

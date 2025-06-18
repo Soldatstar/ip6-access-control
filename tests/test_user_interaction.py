@@ -66,6 +66,7 @@ def test_ask_permission_gui_and_cli(monkeypatch):
         # When
         result = user_interaction.ask_permission(
             syscall_nr=1,
+            syscall_name="brk",
             program_name="prog",
             program_hash="deadbeef",
             parameter_formated="param",
@@ -101,6 +102,7 @@ def test_ask_permission_cli_input(monkeypatch):
         # When
         result = user_interaction.ask_permission(
             syscall_nr=1,
+            syscall_name="brk",
             program_name="prog",
             program_hash="deadbeef",
             parameter_formated="param",
@@ -130,6 +132,7 @@ def test_ask_permission_timeout(monkeypatch):
         # When
         result = user_interaction.ask_permission(
             syscall_nr=1,
+            syscall_name="brk",
             program_name="prog",
             program_hash="deadbeef",
             parameter_formated="param",
@@ -159,6 +162,7 @@ def test_ask_permission_timeout(monkeypatch):
     # Call ask_permission and check result
     result = user_interaction.ask_permission(
         syscall_nr=1,
+        syscall_name="brk",
         program_name="prog",
         program_hash="deadbeef",
         parameter_formated="param",
@@ -203,6 +207,7 @@ def test_ask_permission_timeout(monkeypatch):
         # Call ask_permission and check result
         result = user_interaction.ask_permission(
             syscall_nr=1,
+            syscall_name="brk",
             program_name="prog",
             program_hash="deadbeef",
             parameter_formated="param",

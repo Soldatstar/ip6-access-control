@@ -4,8 +4,8 @@ PYTHON = python3
 PIP = $(VENV_DIR)/bin/pip
 ACTIVATE_LINUX = source $(VENV_DIR)/bin/activate
 SHELL := /bin/bash
-DEMOPROGRAM = demo/file-access
-DEMOCPROGRAM = demo/file-access.c
+DEMOCOMMUNICATION = demo/communication
+DEMOCCOMMUNICATION = demo/communication.c
 DEMONORMALFILES = demo/normal-file
 DEMOCNORMALFILES = demo/normal-file.c
 
@@ -29,13 +29,13 @@ create:
 	$(PYTHON) -m venv $(VENV_DIR) 
 	$(ACTIVATE_LINUX)
 	$(PIP) install -r requirements.txt
-	gcc $(DEMOCPROGRAM) -o $(DEMOPROGRAM)
+	gcc $(DEMOCCOMMUNICATION) -o $(DEMOCOMMUNICATION)
 	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
 
 # Ziel zum Löschen des virtuellen Environments
 delete:
 	rm -rf $(VENV_DIR)
-	-rm -f $(DEMOPROGRAM)
+	-rm -f $(DEMOCOMMUNICATION)
 	-rm -f $(DEMONORMALFILES)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
@@ -53,7 +53,7 @@ delete:
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM)
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCOMMUNICATION)
 
 run2: 
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	
@@ -68,12 +68,17 @@ test:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage run --source=$(SUPERVISOR_DIR),$(USER_TOOL_DIR),$(TEST_DIR) --omit=$(TEST_DIR)/* -m pytest -vv 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage report 
 	$(ACTIVATE_LINUX) && $(PYTHON) -m coverage html
+
 pylint:
-	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py') 
+	$(ACTIVATE_LINUX) && pylint $(shell git ls-files '*.py')
+
 build:
 	$(ACTIVATE_LINUX) && $(PYTHON) -m build
+
 runv: 
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOPROGRAM) --debug 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCOMMUNICATION) --debug
+
 run2v:
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py  $(DEMONORMALFILES)	--debug
+
 .PHONY: help create delete run
