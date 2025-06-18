@@ -147,7 +147,7 @@ def get_question(syscall_nr, argument):
                             LOGGER.debug("Added to parameter_values: %s", a)
                     LOGGER.debug("Parameter '%s' has values: %s", parameter, parameter_values)
                     LOGGER.debug("Checking against provided argument: %s", argument)
-                    if parameter_values and set(argument).issuperset(parameter_values):
+                    if argument and parameter_values.issuperset(set(argument)):
                         LOGGER.info("SUCCESS: Non-empty argument %s is subset of %s", argument, parameter_values)
                         LOGGER.info("Returning parameter: %s", parameter)
                         return parameter
@@ -182,6 +182,7 @@ def argument_separator(argument_raw, argument_pretty):
         list: Extracted arguments.
     """
     argument_values = []
+    para_type = ["[flags]", "[mode]", "[domain]", "[type]"]
 
     for i, raw_value in enumerate(argument_raw):
         if raw_value != "*":
@@ -195,7 +196,7 @@ def argument_separator(argument_raw, argument_pretty):
                     argument_values.append(filename_value)
 
             # Check if the argument is from type flags or mode
-            elif "[flags]" in pretty_value or "[mode]" in pretty_value:
+            elif any(keyword in pretty_value for keyword in para_type):
                 # Split the flags by '|'
                 parts = pretty_value.split("[")[0].split('|')
 

@@ -263,6 +263,10 @@ def prepare_arguments(syscall_args):
                     arguments.append(arg.value)
                 case "mode":
                     arguments.append(arg.value)
+                case "domain":
+                    arguments.append(arg.value)
+                case "type":
+                    arguments.append(arg.value)   
                 case _:
                     arguments.append("*")
         else: 
