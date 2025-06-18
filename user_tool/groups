@@ -16,6 +16,7 @@ a: socket-domain-internet (
 
 a: socket-domain-intern (
   AF_UNIX
+  AF_FILE
   AF_NETLINK
 )
 
@@ -63,4 +64,11 @@ g: SocketCommunication {
     type = socket-type-any
   ]
 
+}
+
+g: MessageQueueCommunication {
+  d: Do you allow communication using message queue
+
+  68 msgget(key_t key, int msgflg)
+  240 mqd_t mq_open(const char *name, int oflag)
 }

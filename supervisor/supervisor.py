@@ -239,7 +239,6 @@ def check_decision_made(syscall_nr, arguments):
 
     return False, False
 
-
 def prepare_arguments(syscall_args):
     """
     Prepare arguments for a syscall based on their type.
@@ -250,26 +249,30 @@ def prepare_arguments(syscall_args):
     Returns:
         list: Prepared arguments.
     """
+    def is_hex(s: str) -> bool:
+        if s.startswith(("0x", "0X")):
+            s = s[2:]
+        
+        if not s:
+            return False
+        
+        hex_digits = set("0123456789abcdefABCDEF")
+        return all(c in hex_digits for c in s)
+
     arguments = []
     for arg in syscall_args:
-        if any(not char.isdigit() for char in arg.format()):
+        formatted = arg.format()
+        if any(not char.isdigit() for char in formatted) and not is_hex(formatted):
             match arg.name:
                 case "filename":
-                    arguments.append(arg.format())
-                case "flags":
+                    arguments.append(formatted)
+                case "flags" | "mode" | "domain" | "type":
                     arguments.append(arg.value)
-                case "mode":
-                    arguments.append(arg.value)
-                case "domain":
-                    arguments.append(arg.value)
-                case "type":
-                    arguments.append(arg.value)   
                 case _:
                     arguments.append("*")
         else: 
             arguments.append("*")
     return arguments
-
 
 def handle_syscall_event(event, process, socket):
     """
