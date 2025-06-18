@@ -181,6 +181,8 @@ def handle_requests():
                     program_name, program_hash)
         LOGGER.debug("Syscall: %s (ID: %s parameter: %s)",
                     syscall_name, syscall_nr, parameter)
+        LOGGER.debug("Syscall: %s (ID: %s parameter: %s)",
+                    syscall_name, syscall_nr, parameter_formated)
         response = user_interaction.ask_permission(
             syscall_nr, syscall_name, program_name, program_hash, parameter_formated, parameter)
 
