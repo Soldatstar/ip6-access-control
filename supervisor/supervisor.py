@@ -316,10 +316,12 @@ def handle_syscall_event(event, process, socket):
                     SYSCALL_ID_SET.discard(sid)
                 LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
                 LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
+
             if decision["decision"] == "ALLOW_THIS":
                 LOGGER.info("Decision: ALLOW_THIS Syscall: %s", syscall.format())
                 LOGGER.debug("Updated ALLOW set with: %s", combined_tuple)
                 ALLOW_SET.add(combined_tuple)
+                
             if decision["decision"] == "DENY":
                 LOGGER.debug("Updated DENY set with: %s", combined_tuple)
                 DENY_SET.add(combined_tuple)

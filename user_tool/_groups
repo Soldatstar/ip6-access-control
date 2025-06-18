@@ -78,13 +78,12 @@ a: xattr-flags (
 # --- Groupings for System Calls ---
 
 g: FileAccess {
+    desc: Controls the ability to open, read, and pread files, including both regular and critical file paths. It governs basic file access operations needed by a process.  
     d: Do you want to allow file access operations
 
     257 openat(int dirfd, const char *pathname, int flags, ... /* mode_t mode */)
     0 read(int fd, void buf[.count], size_t count)
     17 pread(int fd, void buf[.count], size_t count, off_t offset)
-
-
 
     p: Do you want to enable reading files in /etc? [
         pathname = etc-directories
@@ -127,6 +126,7 @@ g: FileAccess {
 }
 
 g: FileOpenCreate {
+    desc: Manages opening existing files and creating new ones via the classic `open` and `creat` syscalls. It covers write modes and file truncation behavior.  
     d: Do you want to allow file opening or creation
     2 open(const char *pathname, int flags, ... /* mode_t mode */)
     85 creat(const char *pathname, mode_t mode)
@@ -141,6 +141,7 @@ g: FileOpenCreate {
 }
 
 g: FileSystemLinks {
+    desc: Controls the creation, deletion, and modification of both hard and symbolic links within the filesystem. This includes legacy and At-style link/unlink operations.  
     d: Do you allow the creation, deletion, or modification of file links (hard or symbolic)
     86 link(const char *oldpath, const char *newpath)
     87 unlink(const char *pathname)
@@ -148,10 +149,10 @@ g: FileSystemLinks {
     263 unlinkat(int dirfd, const char *pathname, int flags)
     265 linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags)
     266 symlinkat(const char *target, int newdirfd, const char *linkpath)
-    
 }
 
 g: FileSystemNodeManagementCreate {
+    desc: Governs creation and removal of filesystem nodes, including directories and special device files, both via legacy and At-style calls.  
     d: Do you allow the creation of directories and special files
     83 mkdir(const char *pathname, mode_t mode)
     84 rmdir(const char *pathname)
@@ -161,11 +162,13 @@ g: FileSystemNodeManagementCreate {
 }
 
 g: FileSystemNodeManagementDelete {
+    desc: Specifically handles the removal of directories using the `rmdir` syscall.  
     d: Do you allow the removal of a directory 
     84 rmdir(const char *pathname)
 }
 
 g: FilePermissions {
+    desc: Controls changing file permissions, ownership, and the process’s umask via chmod, chown, and related calls.  
     d: Do you allow changing file permissions, ownership, or the file mode creation mask
     90 chmod(const char *pathname, mode_t mode)
     91 fchmod(int fd, mode_t mode)
@@ -178,6 +181,7 @@ g: FilePermissions {
 }
 
 g: FileTimestamp {
+    desc: Manages updating of file access and modification timestamps using utime, utimes, and utimensat.  
     d: Do you allow changing file access and modification timestamps
     132 utime(const char *filename, const struct utimbuf *_Nullable times)
     235 utimes(const char *filename, const struct timeval times[_Nullable 2])
@@ -185,12 +189,14 @@ g: FileTimestamp {
 }
 
 g: FileTruncation {
+    desc: Governs resizing files by truncating them to a specified length via truncate and ftruncate.  
     d: Do you allow changing the size of a file by truncating it
     76 truncate(const char *path, off_t length)
     77 ftruncate(int fd, off_t length)
 }
 
 g: FileExtendedAttributes {
+    desc: Enables setting, replacing, and removing extended file attributes through xattr syscalls.  
     d: Do you want to allow setting or removing extended attributes for files
     188 setxattr(const char *path, const char *name, const void value[.size], size_t size, int flags)
     189 lsetxattr(const char *path, const char *name, const void value[.size], size_t size, int flags)
@@ -203,8 +209,8 @@ g: FileExtendedAttributes {
 # --- Grouping Communication ---
 
 g: PipeCommunication {
-  d: Do you allow communication between processes using pipes?
-  
-  22 pipe(int pipefd[2])
-  293 pipe2(int pipefd[2], int flags)
+    desc: Controls inter-process communication via unidirectional pipes, including the pipe2 variant with flags.  
+    d: Do you allow communication between processes using pipes?
+    22 pipe(int pipefd[2])
+    293 pipe2(int pipefd[2], int flags)
 }
