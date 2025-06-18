@@ -6,6 +6,7 @@
 # - Each grouping can use a default questions for when no match occurs, specified with "d:".
 # - Once all arguments for a system call hit, the question is thrown.
 # - Values for parameter must be declared as arguments and assigned using "=".
+# - "desc:" defines a description of the group that will be shown to the user.
 
 # Arguments for file opening modes and flags
 a: read-flags (
@@ -108,8 +109,6 @@ g: FileAccess {
     257 openat(int dirfd, const char *pathname, int flags, ... /* mode_t mode */)
     0 read(int fd, void buf[.count], size_t count)
     17 pread(int fd, void buf[.count], size_t count, off_t offset)
-
-
 
     p: Do you want to enable reading files in /etc? [
         pathname = etc-directories
