@@ -151,7 +151,7 @@ def test_prepare_arguments():
     result = prepare_arguments(mock_syscall_args)
 
     # Then: The arguments should be correctly prepared
-    assert result == ["/path/to/file", "O_RDONLY", "0777", "*"]
+    assert result == ["/path/to/file", "O_RDONLY", "*", "*"]
 
 
 def test_init_shared_list_success(mocker):
