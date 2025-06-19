@@ -13,7 +13,7 @@ def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
 
     # Prepare question text
     group_selector.parse_file(filename=GROUP_FILE)
-    args = group_selector.argument_separator(
+    args, args_no_filter = group_selector.argument_separator(
         argument_raw=parameter_raw,
         argument_pretty=parameter_formated
     )
@@ -68,8 +68,8 @@ def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
         text += "Group: (none)\n"
     text += f"Systemcall: {syscall_name}\n"
 
-    if args:
-        text += f"Parameter: {', '.join(args)}\n"
+    if args or args_no_filter:
+        text += f"Parameter: {', '.join(args_no_filter + args)}\n"
         
 
 

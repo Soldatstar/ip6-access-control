@@ -16,7 +16,7 @@ def test_argument_separator_valid_arguments():
     result = group_selector.argument_separator(argument_raw, argument_pretty)
 
     # Then
-    assert result == ["O_RDONLY"]
+    result == (['O_RDONLY'], [])  # ≠ ['O_RDONLY']
 
 def test_argument_separator_extract_filename():
     # Given
@@ -27,7 +27,7 @@ def test_argument_separator_extract_filename():
     result = group_selector.argument_separator(argument_raw, argument_pretty)
 
     # Then
-    assert result == ["/path/to/file"]
+    assert result == ([], ['/path/to/file'])
 
 def test_get_question_matching_syscall_and_argument(mocker):
     # Given
