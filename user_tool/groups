@@ -27,17 +27,6 @@ a: open-flags-create (
   O_RDWR			
 )
 
-a: open-mode (
-  S_IRUSR
-  S_IWUSR
-  S_IXUSR
-  S_IRGRP
-  S_IWGRP
-  S_IXGRP	
-  S_IROTH	
-  S_IWOTH	
-  S_IXOTH
-)
 
 # --- Arguments Communication ---
 
@@ -68,7 +57,7 @@ a: socket-type-any (
 
 # --- Grouping Normal Files ---
 
-g: AccessFiles {
+g: AccessFile {
   d: Do you allow access to the following file
 
   2 open(const char *pathname, int flags, .../* mode_t mode */ );
@@ -87,8 +76,47 @@ g: AccessFiles {
 
   p: Do you allow the creation and access of the following file? [
     flags = open-flags-create
-    mode = open-mode
   ]
+}
+
+g: ChangeNameFile {
+  d: Do you allow changing name or location of the following file
+  
+  82 rename(const char *oldpath, const char *newpath);
+  264 renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
+  316 renameat2(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, unsigned int flags);  
+}
+
+g: CreateHardOrSoftLink {
+  d: Do you allow the creation of a hard link or symbolic link to the following file
+
+  86 link(const char *oldpath, const char *newpath);
+  265 linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags);
+  88 symlink(const char *target, const char *linkpath);
+  266 symlinkat(const char *target, int newdirfd, const char *linkpath);
+}
+
+g: DeleteFile {
+  d: Do you allow the deletion of the following file
+
+  87 unlink(const char *pathname);
+  263 unlinkat(int dirfd, const char *pathname, int flags);
+
+}
+
+g: DirectoryCreateOrDelete {
+  d: Do you allow the creation or deletion of the following directory
+
+  83 mkdir(const char *pathname, mode_t mode);
+  258 mkdirat(int dirfd, const char *pathname, mode_t mode);
+  84 rmdir(const char *pathname);
+}
+
+g: SpecialFiles {
+  d: Do you allow the creation of the following special file
+
+  133 mknod(const char *pathname, mode_t mode, dev_t dev);
+  259 mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 }
 
 # --- Grouping Communication ---

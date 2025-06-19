@@ -36,12 +36,6 @@
                     "*",
                     "*"
                 ]
-            ],
-            [
-                87,
-                [
-                    "demo/new-normal-file.txt"
-                ]
             ]
         ],
         "denied_syscalls": [

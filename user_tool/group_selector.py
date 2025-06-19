@@ -184,8 +184,8 @@ def argument_separator(argument_raw, argument_pretty):
     """
     argument_values = []
     argument_values_no_filter = []
-    para_type_file = ["[filename]", "[pathname]"]
-    para_type = ["[flags]", "[mode]", "[domain]", "[type]"]
+    para_type_file = ["[filename]", "[pathname]", "[oldname]", "[old]"]
+    para_type = ["[flags]", "[domain]", "[type]"]
 
     for i, raw_value in enumerate(argument_raw):
         if raw_value != "*":
