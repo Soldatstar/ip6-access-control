@@ -6,6 +6,7 @@
 # - Each grouping can use a default questions for when no match occurs, specified with "d:".
 # - Once all arguments for a system call hit, the question is thrown.
 # - Values for parameter must be declared as arguments and assigned using "=".
+# - "desc:" defines a description of the group that will be shown to the user.
 
 # --- Arguments Normal Files ---
 
@@ -26,7 +27,6 @@ a: open-flags-create (
   O_WRONLY	
   O_RDWR			
 )
-
 
 # --- Arguments Communication ---
 
@@ -134,7 +134,29 @@ g: HandleFileOwnership {
   260 fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 }
 
+g: HandleFileTime {
+  d: Do you allow changing timestamp for the following file
+  
+  132 utime(const char *filename, const struct utimbuf *_Nullable times);
+  235 utimes(const char *filename, const struct timeval times[_Nullable 2]);
+  261 futimesat(int dirfd, const char *pathname, const struct timeval times[2]);
+  280 utimensat(int dirfd, const char *pathname, const struct timespec times[_Nullable 2], int flags);
+}
 
+g: HandleFileAttribute {
+  d: Do you allow adding or removing attributes to the following file
+
+  188 setxattr(const char *path, const char *name, const void value[.size], size_t size, int flags);
+  189 lsetxattr(const char *path, const char *name, const void value[.size], size_t size, int flags);
+  197 removexattr(const char *path, const char *name);
+  198 lremovexattr(const char *path, const char *name);
+}
+
+g: FileTrunc {
+  d: Do you allow resizing of the following file
+
+  76 truncate(const char *path, off_t length);
+}
 
 # --- Grouping Communication ---
 

@@ -267,7 +267,7 @@ def prepare_arguments(syscall_args):
         formatted = arg.format()
         if any(not char.isdigit() for char in formatted) and not is_hex(formatted):
             match arg.name:
-                case "filename" | "pathname" | "oldname" | "old":
+                case "filename" | "pathname" | "oldname" | "old" | "path":
                     arguments.append(formatted)
                 case "flags" | "domain" | "type":
                     arguments.append(arg.value)

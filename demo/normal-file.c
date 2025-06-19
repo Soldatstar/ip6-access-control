@@ -8,6 +8,14 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 
+#define _GNU_SOURCE
+#include <stdlib.h>
+#include <utime.h>
+#include <sys/time.h>
+#include <sys/xattr.h>
+#include <time.h>
+
+
 void sys_open(const char *pathname, int flags, mode_t mode, const char *desc) {
     int fd = open(pathname, flags, mode);
     if (fd == -1) {
@@ -160,8 +168,6 @@ void sys_rmdir(const char *pathname, const char *desc) {
     }
 }
 
-//---
-
 void sys_chmod(const char *pathname, mode_t mode, const char *desc) {
     if (chmod(pathname, mode) == -1) {
         printf("chmod(%s) error: %m\n", desc);
@@ -202,7 +208,75 @@ void sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int
     }
 }
 
+void sys_utime(const char *path, const struct utimbuf *times, const char *desc) {
+    if (utime(path, times) == -1) {
+        printf("utime(%s) error: %m\n", desc);
+    } else {
+        printf("utime(%s) success\n", desc);
+    }
+}
+
+void sys_utimes(const char *path, const struct timeval times[2], const char *desc) {
+    if (utimes(path, times) == -1) {
+        printf("utimes(%s) error: %m\n", desc);
+    } else {
+        printf("utimes(%s) success\n", desc);
+    }
+}
+
+void sys_utimensat(int dirfd, const char *file, const struct timespec times[2], const char *desc) {
+    if (utimensat(dirfd, file, times, 0) == -1) {
+        printf("utimensat(%s) error: %m\n", desc);
+    } else {
+        printf("utimensat(%s) success\n", desc);
+    }
+}
+
+
+void sys_truncate(const char *path, const char *desc) {
+    if (truncate(path, 100) == -1) {
+        printf("truncate(%s) error: %m\n", desc);
+    } else {
+        printf("truncate(%s) success\n", desc);
+    }
+}
+
+void sys_setxattr(const char *path, const char *name, const char *value, const char *desc) {
+    if (setxattr(path, name, value, strlen(value), 0) == -1) {
+        printf("setxattr(%s) error: %m\n", desc);
+    } else {
+        printf("setxattr(%s) success\n", desc);
+    }
+}
+
+void sys_lsetxattr(const char *path, const char *name, const char *value, const char *desc) {
+    if (lsetxattr(path, name, value, strlen(value), 0) == -1) {
+        printf("lsetxattr(%s) error: %m\n", desc);
+    } else {
+        printf("lsetxattr(%s) success\n", desc);
+    }
+}
+
+void sys_removexattr(const char *path, const char *name, const char *desc) {
+    if (removexattr(path, name) == -1) {
+        printf("removexattr(%s) error: %m\n", desc);
+    } else {
+        printf("removexattr(%s) success\n", desc);
+    }
+}
+
+void sys_lremovexattr(const char *path, const char *name, const char *desc) {
+    if (lremovexattr(path, name) == -1) {
+        printf("lremovexattr(%s) error: %m\n", desc);
+    } else {
+        printf("lremovexattr(%s) success\n", desc);
+    }
+}
+
+
 int main() {
+    // init
+    sys_creat("demo/normal-file.txt", S_IRUSR | S_IWUSR, "S_IRUSR | S_IWUSR");
     
     // read
     sys_open("demo/normal-file.txt", O_RDONLY, 0, "O_RDONLY");
@@ -218,8 +292,6 @@ int main() {
 
     // create
     sys_open("demo/new-normal-file.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, "O_CREAT|O_WRONLY");
-    sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
-    sys_creat("demo/new-normal-file.txt", S_IRUSR | S_IWUSR, "S_IRUSR | S_IWUSR");
     sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
     sys_openat(AT_FDCWD, "demo/new-normal-file.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, "O_CREAT|O_WRONLY");
     sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
@@ -262,6 +334,26 @@ int main() {
     sys_chown("demo/normal-file.txt", getuid(), getgid(),"getuid, getgid");
     sys_lchown("demo/normal-file.txt", getuid(), getgid(), "getuid, getgid");
     sys_fchownat(AT_FDCWD, "demo/normal-file.txt", getuid(), getgid(), 0, "getuid, getgid");
+
+    //time
+    struct utimbuf timess = {.actime = 1000000000,.modtime = 1000000000};
+    sys_utime("demo/normal-file.txt", &timess, "demo/normal-file.txt");
+    struct timeval times[2] = {{ .tv_sec = 1000000000, .tv_usec = 0 },{ .tv_sec = 1000000000, .tv_usec = 0 }};
+    sys_utimes("demo/normal-file.txt", times, "demo/normal-file.txt");
+    struct timespec timesss[2] = {{ .tv_sec = 1000000000, .tv_nsec = 0 },{ .tv_sec = 1000000000, .tv_nsec = 0 }};
+    sys_utimensat(AT_FDCWD, "demo/normal-file.txt", timesss, "demo/normal-file.txt");
+
+    //trunc
+    sys_truncate("demo/normal-file.txt", "demo/normal-file.txt");
+
+    //attributes
+    sys_setxattr("demo/normal-file.txt", "user.demo", "demo", "user.demo:demo");
+    sys_removexattr("demo/normal-file.txt", "user.demo", "user.demo");
+    sys_lsetxattr("demo/normal-file.txt", "user.demo", "demo", "user.demo:demo");
+    sys_lremovexattr("demo/normal-file.txt", "user.demo", "user.demo");
+
+    //clean up
+    sys_unlink("demo/normal-file.txt", "demo/normal-file.txt");
 
     return 0;
 }

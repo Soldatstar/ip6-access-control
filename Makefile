@@ -8,6 +8,8 @@ DEMOCOMMUNICATION = demo/communication
 DEMOCCOMMUNICATION = demo/communication.c
 DEMONORMALFILES = demo/normal-file
 DEMOCNORMALFILES = demo/normal-file.c
+DEMOBACKUP = demo/normal-file2
+DEMOCBACKUP = demo/normal-file2.c
 
 SUPERVISOR_DIR = supervisor
 USER_TOOL_DIR = user_tool
@@ -31,12 +33,14 @@ create:
 	$(PIP) install -r requirements.txt
 	gcc $(DEMOCCOMMUNICATION) -o $(DEMOCOMMUNICATION)
 	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
+	gcc $(DEMOCBACKUP) -o $(DEMOBACKUP)
 
 # Ziel zum Löschen des virtuellen Environments
 delete:
 	rm -rf $(VENV_DIR)
 	-rm -f $(DEMOCOMMUNICATION)
 	-rm -f $(DEMONORMALFILES)
+	-rm -f $(DEMOBACKUP)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
 	rm -rf supervisor/__pycache__/
