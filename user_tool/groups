@@ -119,6 +119,23 @@ g: SpecialFiles {
   259 mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 }
 
+g: HandleFilePermission {
+  d: Do you allow changing file permission for the following file
+
+  90 chmod(const char *pathname, mode_t mode);
+  268 fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
+}
+
+g: HandleFileOwnership {
+  d: Do you allow changing file ownership for the following file
+
+  92 chown(const char *pathname, uid_t owner, gid_t group);
+  94 lchown(const char *pathname, uid_t owner, gid_t group);
+  260 fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
+}
+
+
+
 # --- Grouping Communication ---
 
 g: PipeCommunication {

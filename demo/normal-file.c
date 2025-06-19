@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/types.h>
 
 void sys_open(const char *pathname, int flags, mode_t mode, const char *desc) {
     int fd = open(pathname, flags, mode);
@@ -159,6 +160,48 @@ void sys_rmdir(const char *pathname, const char *desc) {
     }
 }
 
+//---
+
+void sys_chmod(const char *pathname, mode_t mode, const char *desc) {
+    if (chmod(pathname, mode) == -1) {
+        printf("chmod(%s) error: %m\n", desc);
+    } else {
+        printf("chmod(%s) success\n", desc);
+    }
+}
+
+void sys_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags, const char *desc) {
+    if (fchmodat(dirfd, pathname, mode, flags) == -1) {
+        printf("fchmodat(%s) error: %m\n", desc);
+    } else {
+        printf("fchmodat(%s) success\n", desc);
+    }
+}
+
+void sys_chown(const char *pathname, uid_t owner, gid_t group, const char *desc) {
+    if (chown(pathname, owner, group) == -1) {
+        printf("chown(%s) error: %m\n", desc);
+    } else {
+        printf("chown(%s) success\n", desc);
+    }
+}
+
+void sys_lchown(const char *pathname, uid_t owner, gid_t group, const char *desc) {
+    if (lchown(pathname, owner, group) == -1) {
+        printf("lchown(%s) error: %m\n", desc);
+    } else {
+        printf("lchown(%s) success\n", desc);
+    }
+}
+
+void sys_fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags, const char *desc) {
+    if (fchownat(dirfd, pathname, owner, group, flags) == -1) {
+        printf("fchownat(%s) error: %m\n", desc);
+    } else {
+        printf("fchownat(%s) success\n", desc);
+    }
+}
+
 int main() {
     
     // read
@@ -175,11 +218,11 @@ int main() {
 
     // create
     sys_open("demo/new-normal-file.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, "O_CREAT|O_WRONLY");
-    unlink("demo/new-normal-file.txt");
+    sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
     sys_creat("demo/new-normal-file.txt", S_IRUSR | S_IWUSR, "S_IRUSR | S_IWUSR");
-    unlink("demo/new-normal-file.txt");
+    sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
     sys_openat(AT_FDCWD, "demo/new-normal-file.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, "O_CREAT|O_WRONLY");
-    unlink("demo/new-normal-file.txt");
+    sys_unlink("demo/new-normal-file.txt", "demo/new-normal-file.txt");
     struct open_how how_create = {.flags = O_CREAT | O_WRONLY,.mode = S_IRUSR | S_IWUSR};
     sys_openat2(AT_FDCWD, "demo/new-normal-file.txt", &how_create, sizeof(how_create), "O_CREAT|O_WRONLY");
     unlink("demo/new-normal-file.txt");
@@ -211,6 +254,14 @@ int main() {
     sys_rmdir("demo/dir1", "demo/dir1");
     sys_rmdir("demo/dir2", "demo/dir2");
 
+    // permissions
+    sys_chmod("demo/normal-file.txt", S_IROTH | S_IWOTH, "S_IRUSR | S_IWUSR");
+    sys_fchmodat(AT_FDCWD, "demo/normal-file.txt", 0666, 0, "0755");
+
+    // ownership
+    sys_chown("demo/normal-file.txt", getuid(), getgid(),"getuid, getgid");
+    sys_lchown("demo/normal-file.txt", getuid(), getgid(), "getuid, getgid");
+    sys_fchownat(AT_FDCWD, "demo/normal-file.txt", getuid(), getgid(), 0, "getuid, getgid");
 
     return 0;
 }
