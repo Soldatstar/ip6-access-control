@@ -38,7 +38,7 @@ def test_non_blocking_input_no_input(monkeypatch):
 def test_ask_permission_gui_and_cli(monkeypatch):
     # Given
     monkeypatch.setattr(user_interaction.group_selector, "parse_file", lambda filename: None)
-    monkeypatch.setattr(user_interaction.group_selector, "argument_separator", lambda argument_raw, argument_pretty: argument_raw)
+    monkeypatch.setattr(user_interaction.group_selector, "argument_separator",lambda argument_raw, argument_pretty: (argument_raw, []))
     monkeypatch.setattr(user_interaction.group_selector, "get_question", lambda syscall_nr, argument: "Allow operation?")
     with patch("tkinter.Tk") as mock_tk:
         mock_root = MagicMock()
@@ -80,7 +80,7 @@ def test_ask_permission_gui_and_cli(monkeypatch):
 def test_ask_permission_cli_input(monkeypatch):
     # Given
     monkeypatch.setattr(user_interaction.group_selector, "parse_file", lambda filename: None)
-    monkeypatch.setattr(user_interaction.group_selector, "argument_separator", lambda argument_raw, argument_pretty: argument_raw)
+    monkeypatch.setattr(user_interaction.group_selector, "argument_separator",lambda argument_raw, argument_pretty: (argument_raw, []))
     monkeypatch.setattr(user_interaction.group_selector, "get_question", lambda syscall_nr, argument: "Allow operation?")
     with patch("tkinter.Tk") as mock_tk:
         mock_root = MagicMock()
@@ -116,7 +116,7 @@ def test_ask_permission_cli_input(monkeypatch):
 def test_ask_permission_timeout(monkeypatch):
     # Given
     monkeypatch.setattr(user_interaction.group_selector, "parse_file", lambda filename: None)
-    monkeypatch.setattr(user_interaction.group_selector, "argument_separator", lambda argument_raw, argument_pretty: argument_raw)
+    monkeypatch.setattr(user_interaction.group_selector, "argument_separator",lambda argument_raw, argument_pretty: (argument_raw, []))
     monkeypatch.setattr(user_interaction.group_selector, "get_question", lambda syscall_nr, argument: "Allow operation?")
     with patch("tkinter.Tk") as mock_tk:
         mock_root = MagicMock()
@@ -179,7 +179,7 @@ def test_ask_permission_timeout(monkeypatch):
     """
     # Patch group_selector functions to avoid file IO and logic
     monkeypatch.setattr(user_interaction.group_selector, "parse_file", lambda filename: None)
-    monkeypatch.setattr(user_interaction.group_selector, "argument_separator", lambda argument_raw, argument_pretty: argument_raw)
+    monkeypatch.setattr(user_interaction.group_selector, "argument_separator",lambda argument_raw, argument_pretty: (argument_raw, []))
     monkeypatch.setattr(user_interaction.group_selector, "get_question", lambda syscall_nr, argument: "Allow operation?")
 
     # Patch tkinter so no real GUI is created

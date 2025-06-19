@@ -179,23 +179,23 @@ def argument_separator(argument_raw, argument_pretty):
         argument_pretty (list): Formatted arguments of the syscall.
 
     Returns:
-        list: Extracted arguments.
+        argument_values: Extracted arguments for question picking
+        argument_values_no_filter: Extracted arguments only for user information
     """
     argument_values = []
+    argument_values_no_filter = []
+    para_type_file = ["[filename]", "[pathname]"]
     para_type = ["[flags]", "[mode]", "[domain]", "[type]"]
 
     for i, raw_value in enumerate(argument_raw):
         if raw_value != "*":
             pretty_value = argument_pretty[i]
 
-            # Check if the argument is from type filename
-            if "[filename]" in pretty_value:
+            if any(keyword in pretty_value for keyword in para_type_file):
                 # Extract the filename value and add it to argument values
                 filename_value = pretty_value.split("[")[0].strip("'")
                 if filename_value != '':
-                    argument_values.append(filename_value)
-
-            # Check if the argument is from type flags or mode
+                    argument_values_no_filter.append(filename_value)
             elif any(keyword in pretty_value for keyword in para_type):
                 # Split the flags by '|'
                 parts = pretty_value.split("[")[0].split('|')
@@ -209,7 +209,7 @@ def argument_separator(argument_raw, argument_pretty):
                     part) for part in parts if clean_part(part) != '']
                 argument_values.extend(flag_mode_values)
 
-    return argument_values
+    return argument_values, argument_values_no_filter
 
 
 
