@@ -77,7 +77,7 @@ def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
     root = tk.Tk()
     root.title("Permission Request")
     width = max(500, len(parameter_formated)*7 + 250)
-    root.geometry(f"{width}x320")
+    root.geometry(f"{width}x400")
 
     #color scheme
     BG_COLOR = "#2E2E2E"

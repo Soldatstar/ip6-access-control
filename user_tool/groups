@@ -58,6 +58,7 @@ a: socket-type-any (
 # --- Grouping Normal Files ---
 
 g: AccessFile {
+  desc: Controls basic file access operations including opening existing files and creating new ones. Manages read and write permissions for files in the filesystem.
   d: Do you allow access to the following file
 
   2 open(const char *pathname, int flags, .../* mode_t mode */ );
@@ -80,6 +81,7 @@ g: AccessFile {
 }
 
 g: ChangeNameFile {
+  desc: Manages operations that change file names or move files between directories. These operations modify the file location without changing its content.
   d: Do you allow changing name or location of the following file
   
   82 rename(const char *oldpath, const char *newpath);
@@ -88,6 +90,7 @@ g: ChangeNameFile {
 }
 
 g: CreateHardOrSoftLink {
+  desc: Controls the creation of links between files. Hard links create additional references to the same file, while symbolic links create references that point to another file path.
   d: Do you allow the creation of a hard link or symbolic link to the following file
 
   86 link(const char *oldpath, const char *newpath);
@@ -97,6 +100,7 @@ g: CreateHardOrSoftLink {
 }
 
 g: DeleteFile {
+  desc: Manages file deletion operations that remove files from the filesystem. Once deleted, the file contents may no longer be accessible.
   d: Do you allow the deletion of the following file
 
   87 unlink(const char *pathname);
@@ -105,6 +109,7 @@ g: DeleteFile {
 }
 
 g: DirectoryCreateOrDelete {
+  desc: Controls operations that create new directories or remove existing empty directories. These operations modify the filesystem structure.
   d: Do you allow the creation or deletion of the following directory
 
   83 mkdir(const char *pathname, mode_t mode);
@@ -113,6 +118,7 @@ g: DirectoryCreateOrDelete {
 }
 
 g: SpecialFiles {
+  desc: Controls the creation of special files such as device nodes, named pipes, or UNIX domain sockets. These files serve as interface points for system resources and IPC mechanisms.
   d: Do you allow the creation of the following special file
 
   133 mknod(const char *pathname, mode_t mode, dev_t dev);
@@ -120,6 +126,7 @@ g: SpecialFiles {
 }
 
 g: HandleFilePermission {
+  desc: Manages operations that modify file permission bits controlling who can read, write, or execute a file. These operations affect the security attributes of files.
   d: Do you allow changing file permission for the following file
 
   90 chmod(const char *pathname, mode_t mode);
@@ -127,6 +134,7 @@ g: HandleFilePermission {
 }
 
 g: HandleFileOwnership {
+  desc: Controls operations that change file ownership, determining which user and group owns a particular file. These permissions affect access control and resource accounting.
   d: Do you allow changing file ownership for the following file
 
   92 chown(const char *pathname, uid_t owner, gid_t group);
@@ -135,6 +143,7 @@ g: HandleFileOwnership {
 }
 
 g: HandleFileTime {
+  desc: Manages operations that modify file timestamps such as access time, modification time, and status change time. These operations affect file metadata but not content.
   d: Do you allow changing timestamp for the following file
   
   132 utime(const char *filename, const struct utimbuf *_Nullable times);
@@ -144,6 +153,7 @@ g: HandleFileTime {
 }
 
 g: HandleFileAttribute {
+  desc: Controls operations that manage extended attributes for files. Extended attributes store additional metadata beyond standard file properties.
   d: Do you allow adding or removing attributes to the following file
 
   188 setxattr(const char *path, const char *name, const void value[.size], size_t size, int flags);
@@ -153,6 +163,7 @@ g: HandleFileAttribute {
 }
 
 g: FileTrunc {
+  desc: Controls operations that resize files, typically by shortening them to a specified length. Truncation permanently removes data beyond the specified point.
   d: Do you allow resizing of the following file
 
   76 truncate(const char *path, off_t length);
@@ -161,6 +172,7 @@ g: FileTrunc {
 # --- Grouping Communication ---
 
 g: PipeCommunication {
+  desc: Controls creation and use of pipes for inter-process communication. Pipes allow unidirectional data flow between related processes.
   d: Do you allow communication between processes using pipes
   
   22 pipe(int pipefd[2])
@@ -168,6 +180,7 @@ g: PipeCommunication {
 }
 
 g: SocketCommunication {
+  desc: Manages socket-based communication for both network and local inter-process communication. Sockets enable data exchange between processes locally or across networks.
   d: Do you allow communication using sockets
 
   41 socket(int domain, int type, int protocol)
@@ -191,6 +204,7 @@ g: SocketCommunication {
 }
 
 g: MessageQueueCommunication {
+  desc: Controls operations for message queue-based inter-process communication. Message queues allow processes to exchange discrete messages in a structured format.
   d: Do you allow communication using message queue
 
   68 msgget(key_t key, int msgflg)
@@ -198,6 +212,7 @@ g: MessageQueueCommunication {
 }
 
 g: SharedMemoryCommunication {
+  desc: Manages operations for shared memory-based inter-process communication. Shared memory allows multiple processes to access the same memory region for efficient data exchange.
   d: Do you allow communication using shared memory
   
   29 shmget(key_t key, size_t size, int shmflg)
