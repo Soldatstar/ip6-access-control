@@ -296,3 +296,401 @@ def test_main_keyboard_interrupt(monkeypatch):
     mock_child.join.assert_called_once()
     mock_socket.close.assert_called_once()
     mock_debugger.quit.assert_called_once()
+
+
+def test_main_process_signal(monkeypatch):
+    """
+    Test that main() handles ProcessSignal by advancing the process.
+    """
+    from supervisor import supervisor
+    import ptrace.debugger
+    # Setup mocks
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate ProcessSignal in the loop
+    # ProcessSignal(signum, process)
+    dummy_signal = ptrace.debugger.ProcessSignal(5, mock_process)
+    dummy_signal.name = "SIGTRAP"
+    mock_debugger.waitSyscall.side_effect = [dummy_signal]
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+
+    supervisor.main()
+
+    mock_logger.debug.assert_any_call("***SIGNAL***: %s", "SIGTRAP")
+    assert mock_process.syscall.called
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+def test_main_new_process_event(monkeypatch):
+    """
+    Test that main() handles NewProcessEvent by re-attaching and advancing.
+    """
+    from supervisor import supervisor
+    import ptrace.debugger
+    # Setup mocks
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate NewProcessEvent in the loop
+    # NewProcessEvent(process)
+    dummy_newproc_process = MagicMock()
+    dummy_newproc_process.parent = MagicMock()
+    dummy_newproc_process.parent.syscall = MagicMock()
+    dummy_newproc = ptrace.debugger.NewProcessEvent(dummy_newproc_process)
+    mock_debugger.waitSyscall.side_effect = [dummy_newproc, KeyboardInterrupt()]
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+
+    supervisor.main()
+
+    mock_logger.info.assert_any_call("***CHILD-PROCESS***")
+    # Accept at least one call (loop continues after continue)
+    assert mock_debugger.waitSyscall.call_count >= 1
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+def test_main_process_exit(monkeypatch):
+    """
+    Test that main() handles ProcessExit and logs execution time.
+    """
+    from supervisor import supervisor
+    import time as real_time
+    import ptrace.debugger
+    # Setup mocks
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate ProcessExit in the loop
+    # ProcessExit(process)
+    dummy_exit = ptrace.debugger.ProcessExit(mock_process)
+    mock_debugger.waitSyscall.side_effect = [dummy_exit]
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+    # Patch time to control duration
+    monkeypatch.setattr(supervisor.time, "time", lambda: 1000.0)
+    monkeypatch.setattr(supervisor.time, "strftime", real_time.strftime)
+    monkeypatch.setattr(supervisor.time, "localtime", real_time.localtime)
+
+    supervisor.main()
+
+    mock_logger.info.assert_any_call("***PROCESS-EXECUTED***")
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+def test_main_generic_exception(monkeypatch):
+    """
+    Test that main() handles generic Exception and logs error.
+    """
+    from supervisor import supervisor
+    import time as real_time
+    # Setup mocks
+    monkeypatch.setattr(supervisor, "argv", ["supervisor.py", "dummy_prog"])
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+    monkeypatch.setattr(supervisor, "set_program_path", MagicMock())
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "setup_zmq", MagicMock(return_value=mock_socket))
+    monkeypatch.setattr(supervisor, "init_shared_list", MagicMock())
+    mock_process = MagicMock()
+    mock_child = MagicMock()
+    mock_child.pid = 123
+    mock_child.start = MagicMock()
+    monkeypatch.setattr(supervisor, "Process", MagicMock(return_value=mock_child))
+    mock_debugger = MagicMock()
+    monkeypatch.setattr(supervisor, "PtraceDebugger", MagicMock(return_value=mock_debugger))
+    mock_debugger.addProcess.return_value = mock_process
+    mock_process.waitSignals.return_value = MagicMock()
+    mock_process.syscall = MagicMock()
+    mock_process.cont = MagicMock()
+    # Simulate Exception in the loop
+    exc = Exception("fail!")
+    mock_debugger.waitSyscall.side_effect = [exc]
+    monkeypatch.setattr(supervisor, "handle_syscall_event", MagicMock())
+    mock_child.join = MagicMock()
+    mock_socket.close = MagicMock()
+    mock_debugger.quit = MagicMock()
+    # Patch time to control duration
+    monkeypatch.setattr(supervisor.time, "time", lambda: 1000.0)
+    monkeypatch.setattr(supervisor.time, "strftime", real_time.strftime)
+    monkeypatch.setattr(supervisor.time, "localtime", real_time.localtime)
+    monkeypatch.setattr(supervisor, "traceback", __import__("traceback"))
+
+    supervisor.main()
+
+    # Use assert_any_call for logger.error with the actual exception object
+    mock_logger.error.assert_any_call("Exception in main loop: %s", exc)
+    # The rest of the assertions remain unchanged
+    mock_logger.info.assert_any_call("Child process execution stopped due to error after %.3f seconds", 0.0)
+    mock_child.join.assert_called_once()
+    mock_socket.close.assert_called_once()
+    mock_debugger.quit.assert_called_once()
+
+def make_mock_syscall(syscall_nr=2, syscall_name="open", result=None, arguments=None):
+    mock_syscall = MagicMock()
+    mock_syscall.syscall = syscall_nr
+    mock_syscall.name = syscall_name
+    mock_syscall.result = result
+    mock_syscall.arguments = arguments or []
+    mock_syscall.format.return_value = f"{syscall_name}({', '.join(str(a) for a in mock_syscall.arguments)})"
+    return mock_syscall
+
+def make_mock_event(mock_process, syscall_nr=2, syscall_name="open", result=None, arguments=None):
+    mock_event = MagicMock()
+    mock_event.process = mock_process
+    mock_state = MagicMock()
+    mock_event.process.syscall_state = mock_state
+    mock_state.event.return_value = make_mock_syscall(
+        syscall_nr=syscall_nr, syscall_name=syscall_name, result=result, arguments=arguments
+    )
+    return mock_event
+
+def make_mock_argument(name, value=None, formatted=None):
+    arg = MagicMock()
+    arg.name = name
+    arg.value = value if value is not None else name
+    arg.format.return_value = formatted if formatted is not None else str(value if value is not None else name)
+    return arg
+
+@pytest.mark.parametrize("decision, expected_allow, expected_deny", [
+    ("ALLOW", True, False),
+    ("ALLOW_THIS", True, False),
+    ("DENY", False, True),
+])
+def test_handle_syscall_event_new_decision(monkeypatch, decision, expected_allow, expected_deny):
+    """
+    Test handle_syscall_event for new syscalls with different decisions.
+    """
+    from supervisor import supervisor
+
+    # Setup
+    syscall_nr = 2
+    syscall_name = "open"
+    arguments = [make_mock_argument("filename", "/tmp/file", "/tmp/file")]
+    mock_process = MagicMock()
+    mock_event = make_mock_event(mock_process, syscall_nr, syscall_name, result=None, arguments=arguments)
+    mock_socket = MagicMock()
+    # Patch SYSCALL_ID_SET to contain the syscall_nr
+    monkeypatch.setattr(supervisor, "SYSCALL_ID_SET", {syscall_nr})
+    # Patch check_decision_made to always return (False, False)
+    monkeypatch.setattr(supervisor, "check_decision_made", lambda *args, **kwargs: (False, False))
+    # Patch ask_for_permission_zmq to return the desired decision
+    monkeypatch.setattr(supervisor, "ask_for_permission_zmq", lambda **kwargs: {"decision": decision, "allowed_ids": []})
+    # Patch ALLOW_SET and DENY_SET
+    monkeypatch.setattr(supervisor, "ALLOW_SET", set())
+    monkeypatch.setattr(supervisor, "DENY_SET", set())
+
+    supervisor.handle_syscall_event(mock_event, mock_process, mock_socket)
+
+    if decision == "ALLOW_THIS":
+        assert (syscall_nr, "*") in supervisor.ALLOW_SET or any(t[0] == syscall_nr for t in supervisor.ALLOW_SET)
+    if decision == "DENY":
+        assert any(t[0] == syscall_nr for t in supervisor.DENY_SET)
+
+def test_handle_syscall_event_already_allowed(monkeypatch):
+    """
+    Test handle_syscall_event when syscall is already allowed.
+    """
+    from supervisor import supervisor
+
+    syscall_nr = 2
+    syscall_name = "open"
+    arguments = [make_mock_argument("filename", "/tmp/file", "/tmp/file")]
+    mock_process = MagicMock()
+    mock_event = make_mock_event(mock_process, syscall_nr, syscall_name, result=None, arguments=arguments)
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "SYSCALL_ID_SET", {syscall_nr})
+    monkeypatch.setattr(supervisor, "check_decision_made", lambda *args, **kwargs: (True, False))
+    supervisor.handle_syscall_event(mock_event, mock_process, mock_socket)
+    # Should just call process.syscall() once
+    assert mock_process.syscall.call_count >= 1
+
+def test_handle_syscall_event_already_denied(monkeypatch):
+    """
+    Test handle_syscall_event when syscall is already denied.
+    """
+    from supervisor import supervisor
+
+    syscall_nr = 2
+    syscall_name = "open"
+    arguments = [make_mock_argument("filename", "/tmp/file", "/tmp/file")]
+    mock_process = MagicMock()
+    mock_event = make_mock_event(mock_process, syscall_nr, syscall_name, result=None, arguments=arguments)
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "SYSCALL_ID_SET", {syscall_nr})
+    monkeypatch.setattr(supervisor, "check_decision_made", lambda *args, **kwargs: (False, True))
+    supervisor.handle_syscall_event(mock_event, mock_process, mock_socket)
+    # Should call setreg for 'orig_rax' and 'rax' if string param
+    assert mock_process.setreg.called or mock_process.syscall.called
+
+def test_handle_syscall_event_not_in_blacklist(monkeypatch):
+    """
+    Test handle_syscall_event when syscall is not in SYSCALL_ID_SET (should just advance).
+    """
+    from supervisor import supervisor
+
+    syscall_nr = 99
+    syscall_name = "unknown"
+    arguments = [make_mock_argument("filename", "/tmp/file", "/tmp/file")]
+    mock_process = MagicMock()
+    mock_event = make_mock_event(mock_process, syscall_nr, syscall_name, result=None, arguments=arguments)
+    mock_socket = MagicMock()
+    monkeypatch.setattr(supervisor, "SYSCALL_ID_SET", set())
+    supervisor.handle_syscall_event(mock_event, mock_process, mock_socket)
+    # Should just call process.syscall() once
+    assert mock_process.syscall.call_count == 1
+
+
+def test_init_seccomp_adds_rules(monkeypatch):
+    """
+    Test that init_seccomp adds rules for numeric arguments and skips '*' and strings.
+    """
+    from supervisor import supervisor
+
+    mock_sys_filter = MagicMock()
+    mock_arg = MagicMock()
+    mock_errno = MagicMock()
+    monkeypatch.setattr(supervisor, "SyscallFilter", MagicMock(return_value=mock_sys_filter))
+    monkeypatch.setattr(supervisor, "Arg", MagicMock(return_value=mock_arg))
+    monkeypatch.setattr(supervisor, "ERRNO", MagicMock(return_value=mock_errno))
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+
+    # Only numeric args: should add rule
+    deny_list = [
+        [1, 42, 43],  # syscall 1, args 42, 43
+    ]
+    supervisor.init_seccomp(deny_list)
+    mock_sys_filter.add_rule.assert_called_once()
+    mock_sys_filter.load.assert_called_once()
+    mock_logger.info.assert_any_call("Seccomp filter initialized with deny list: %s", deny_list)
+    mock_logger.info.assert_any_call("Loading seccomp filter")
+
+def test_init_seccomp_ignores_star(monkeypatch):
+    """
+    Test that init_seccomp ignores '*' arguments and still adds rule if all are '*'.
+    """
+    from supervisor import supervisor
+
+    mock_sys_filter = MagicMock()
+    mock_arg = MagicMock()
+    mock_errno = MagicMock()
+    monkeypatch.setattr(supervisor, "SyscallFilter", MagicMock(return_value=mock_sys_filter))
+    monkeypatch.setattr(supervisor, "Arg", MagicMock(return_value=mock_arg))
+    monkeypatch.setattr(supervisor, "ERRNO", MagicMock(return_value=mock_errno))
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+
+    # All '*' args: should add rule with no args
+    deny_list = [
+        [2, "*", "*"],  # syscall 2, args '*', '*'
+    ]
+    supervisor.init_seccomp(deny_list)
+    mock_sys_filter.add_rule.assert_called_once()
+    mock_sys_filter.load.assert_called_once()
+
+def test_init_seccomp_stops_on_string(monkeypatch):
+    """
+    Test that init_seccomp stops rule preparation if a string argument is not '*'.
+    """
+    from supervisor import supervisor
+
+    mock_sys_filter = MagicMock()
+    mock_arg = MagicMock()
+    mock_errno = MagicMock()
+    monkeypatch.setattr(supervisor, "SyscallFilter", MagicMock(return_value=mock_sys_filter))
+    monkeypatch.setattr(supervisor, "Arg", MagicMock(return_value=mock_arg))
+    monkeypatch.setattr(supervisor, "ERRNO", MagicMock(return_value=mock_errno))
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+
+    # String arg (not '*'): should not add rule
+    deny_list = [
+        [3, "foo", 99],  # syscall 3, arg "foo" (should stop and not add)
+    ]
+    supervisor.init_seccomp(deny_list)
+    mock_sys_filter.add_rule.assert_not_called()
+    mock_sys_filter.load.assert_called_once()
+
+def test_init_seccomp_typeerror(monkeypatch):
+    """
+    Test that init_seccomp logs a warning if TypeError occurs.
+    """
+    from supervisor import supervisor
+
+    mock_sys_filter = MagicMock()
+    def raise_typeerror(*a, **kw):
+        raise TypeError("fail")
+    mock_sys_filter.add_rule.side_effect = raise_typeerror
+    mock_arg = MagicMock()
+    mock_errno = MagicMock()
+    monkeypatch.setattr(supervisor, "SyscallFilter", MagicMock(return_value=mock_sys_filter))
+    monkeypatch.setattr(supervisor, "Arg", MagicMock(return_value=mock_arg))
+    monkeypatch.setattr(supervisor, "ERRNO", MagicMock(return_value=mock_errno))
+    mock_logger = MagicMock()
+    monkeypatch.setattr(supervisor, "LOGGER", mock_logger)
+
+    deny_list = [
+        [4, 1, 2],
+    ]
+    supervisor.init_seccomp(deny_list)
+    mock_logger.warning.assert_any_call(
+        "TypeError: %s - For syscall_nr: %s, argument: %s at position: %s",
+        ANY, 4, 2, 1
+    )
+    mock_sys_filter.load.assert_called_once()
