@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name             = "ip6-access-control"
-version          = "0.0.3.post1"
+version          = "0.0.4"
 authors          = [
   { name = "Damjan Mlinar" },
   { name = "Viktor Weilenmann" },
