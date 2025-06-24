@@ -44,6 +44,7 @@ PROGRAM_ABSOLUTE_PATH = None
 
 ALLOW_SET = set()  # Set of tuples: (syscall_nr, arg1, arg2, ...)
 DENY_SET = set()
+DENY_NO_SECCOMP = set()
 SYSCALL_ID_SET = set()
 
 def init_seccomp(deny_list):
@@ -186,6 +187,7 @@ def init_shared_list(socket):
         if response_data['status'] == "success":
             ALLOW_SET.clear()
             DENY_SET.clear()
+            DENY_NO_SECCOMP.clear()
             SYSCALL_ID_SET.clear()
             for syscall in response_data['data']['allowed_syscalls']:
                 syscall_number = syscall[0]
@@ -328,22 +330,33 @@ def handle_syscall_event(event, process, socket):
             if decision["decision"] == "DENY":
                 LOGGER.debug("Updated DENY set with: %s", combined_tuple)
                 DENY_SET.add(combined_tuple)
+                DENY_NO_SECCOMP.add(combined_tuple)
                 LOGGER.debug("DENY set after update: %s", DENY_SET)
+                LOGGER.debug("DENY_NO_SECCOMP set after update: %s", DENY_NO_SECCOMP)
                 LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
                 process.setreg('orig_rax', -EPERM)
-                process.syscall()
-                event.process.debugger.waitSyscall()
                 process.setreg('rax', -EPERM)
         elif decided_to_deny:
+            no_seccomp = False
+
+            if combined_tuple in DENY_NO_SECCOMP:
+                no_seccomp = True
+
+            for deny_key in DENY_NO_SECCOMP:
+                if deny_key[0] == syscall_number and len(deny_key) == len(combined_tuple):
+                    if all(a == "*" or a == b for a, b in zip(deny_key[1:], combined_tuple[1:])):
+                        no_seccomp = True
+
             if any(isinstance(arg, str) and arg != "*" for arg in syscall_args):
-                LOGGER.debug("Syscall: %s has a string parameter and must be denied without seccomp", syscall_args)
+                no_seccomp = True
+                
+            if no_seccomp: 
+                LOGGER.debug("Syscall: %s must be denied without seccomp", syscall_args)
                 LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
                 process.setreg('orig_rax', -EPERM)
-                process.syscall()
-                event.process.debugger.waitSyscall()
                 process.setreg('rax', -EPERM)
             else:
-                LOGGER.debug("Syscall %s has no string parameters and will be denied by seccomp", syscall.format())
+                LOGGER.debug("Syscall %s will be denied by seccomp", syscall.format())
         else:
             LOGGER.debug("Syscall %s was already allowed", syscall.format())
     process.syscall()
