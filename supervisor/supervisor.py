@@ -294,7 +294,13 @@ def handle_syscall_event(event, process, socket):
     if syscall.result is None:
         syscall_number = syscall.syscall
         syscall_name = syscall.name
-        if syscall_number not in SYSCALL_ID_SET:
+        should_be_denied = False
+
+        for deny_key in DENY_SET:
+            if deny_key[0] == syscall_number:
+                should_be_denied = True
+
+        if not should_be_denied and syscall_number not in SYSCALL_ID_SET:
             LOGGER.debug("Skipping non blacklisted call: %s %s", syscall_number, syscall_name)
             process.syscall()
             return
