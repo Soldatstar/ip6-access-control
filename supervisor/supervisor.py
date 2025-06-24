@@ -441,9 +441,12 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Supervisor Main")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--silent", action="store_true", help="Suppress all output except errors")
     args, unknown = parser.parse_known_args()
 
     log_level = logging.DEBUG if args.debug else logging.INFO
+    if args.silent:
+        log_level = logging.ERROR
     LOGGER.setLevel(log_level)
     for handler in LOGGER.handlers:
         handler.setLevel(log_level)

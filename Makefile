@@ -57,10 +57,10 @@ delete:
 	
 # Ziel zum Ausführen des Skripts (Linux)
 run: 
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCOMMUNICATION)
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCOMMUNICATION) --silent
 
 run2: 
-	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	--silent
 
 ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py
