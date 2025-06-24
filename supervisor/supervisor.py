@@ -294,16 +294,6 @@ def handle_syscall_event(event, process, socket):
     if syscall.result is None:
         syscall_number = syscall.syscall
         syscall_name = syscall.name
-        should_be_denied = False
-
-        for deny_key in DENY_SET:
-            if deny_key[0] == syscall_number:
-                should_be_denied = True
-
-        if not should_be_denied and syscall_number not in SYSCALL_ID_SET:
-            LOGGER.debug("Skipping non blacklisted call: %s %s", syscall_number, syscall_name)
-            process.syscall()
-            return
 
         LOGGER.info("Syscall number: %s", syscall_number)
         syscall_args = prepare_arguments(syscall_args=syscall.arguments)
@@ -311,7 +301,12 @@ def handle_syscall_event(event, process, socket):
         combined_tuple = tuple([syscall_number] + syscall_args)
         LOGGER.info("Catching new syscall: %s", syscall.format())
         decided_to_allow, decided_to_deny = check_decision_made(syscall_nr=syscall_number, arguments=syscall_args)
-        
+
+        if not decided_to_deny and syscall_number not in SYSCALL_ID_SET:
+            LOGGER.debug("Skipping non blacklisted call: %s %s", syscall_number, syscall_name)
+            process.syscall()
+            return
+
         if not decided_to_allow and not decided_to_deny:
             decision = ask_for_permission_zmq(
                 syscall_name=syscall_name,
