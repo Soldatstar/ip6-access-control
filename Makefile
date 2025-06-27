@@ -10,6 +10,8 @@ DEMONORMALFILES = demo/normal-file
 DEMOCNORMALFILES = demo/normal-file.c
 DEMOBACKUP = demo/normal-file2
 DEMOCBACKUP = demo/normal-file2.c
+DEMOCHILDP = demo/child-process
+DEMOCCHILDP = demo/child-process.c
 
 SUPERVISOR_DIR = supervisor
 USER_TOOL_DIR = user_tool
@@ -21,6 +23,7 @@ help:
 	@echo "  make create: Erstellt ein virtuelles Environment und installiert Abhängigkeiten."
 	@echo "  make delete: Löscht das virtuelle Environment."
 	@echo "  make run: Aktiviert das virtuelle Environment und führt supervisor.py aus (Linux)."
+	@echo "  make runv: Aktiviert das virtuelle Environment und führt supervisor.py im Debug-Modus aus (Linux)."
 	@echo "  make ut: Aktiviert das virtuelle Environment und führt user_tool.py aus (Linux)."
 	@echo "  make utv: Aktiviert das virtuelle Environment und führt user_tool.py im Debug-Modus aus (Linux)."
 	@echo "  make test: Aktiviert das virtuelle Environment und führt die Tests aus (Linux)."
@@ -34,6 +37,7 @@ create:
 	gcc $(DEMOCCOMMUNICATION) -o $(DEMOCOMMUNICATION)
 	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
 	gcc $(DEMOCBACKUP) -o $(DEMOBACKUP)
+	gcc $(DEMOCCHILDP) -o $(DEMOCHILDP)
 
 # Ziel zum Löschen des virtuellen Environments
 delete:
@@ -41,6 +45,7 @@ delete:
 	-rm -f $(DEMOCOMMUNICATION)
 	-rm -f $(DEMONORMALFILES)
 	-rm -f $(DEMOBACKUP)
+	-rm -f $(DEMOCHILDP)
 	rm -rf process-supervisor/
 	rm -rf user_tool/__pycache__/
 	rm -rf supervisor/__pycache__/
@@ -61,6 +66,9 @@ run:
 
 run2: 
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMONORMALFILES)	--silent
+
+run3: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCHILDP)	--silent
 
 ut:
 	$(ACTIVATE_LINUX) && $(PYTHON) user_tool/user_tool_main.py
@@ -84,5 +92,8 @@ runv:
 
 run2v:
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py  $(DEMONORMALFILES)	--debug
+
+run3v: 
+	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCHILDP) --debug
 
 .PHONY: help create delete run

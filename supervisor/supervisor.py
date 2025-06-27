@@ -299,7 +299,7 @@ def handle_syscall_event(event, process, socket):
         syscall_args = prepare_arguments(syscall_args=syscall.arguments)
         syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
         combined_tuple = tuple([syscall_number] + syscall_args)
-        LOGGER.info("Catching new syscall: %s", syscall.format())
+        LOGGER.info("Catching new syscall: %s PID: %d", syscall.format(), process.pid)
         decided_to_allow, decided_to_deny = check_decision_made(syscall_nr=syscall_number, arguments=syscall_args)
 
         if not decided_to_deny and syscall_number not in SYSCALL_ID_SET:
@@ -385,7 +385,7 @@ def main():
     debugger = PtraceDebugger()
     debugger.traceFork()
     child.start()
-    LOGGER.debug("Starting child process with deny list: %s", DENY_SET)
+    LOGGER.debug("Starting monitor process with deny list: %s", DENY_SET)
 
     process = debugger.addProcess(pid=child.pid, is_attached=False)
 
@@ -396,45 +396,42 @@ def main():
     
     # Start timing the child execution
     start_time = time.time()
-    LOGGER.info("Child process execution started at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
-
-    running = True
+    LOGGER.info("Monitor process execution started at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     LOGGER.debug("Starting main loop to monitor syscalls")
-    while running:
+    
+    while debugger:
         try:
              # This will either return a syscall event or raise ProcessSignal/NewProcessEvent/ProcessExit
              event = debugger.waitSyscall()
 
              # If it's genuinely a syscall event, handle it:
-             handle_syscall_event(event, process, socket)
+             handle_syscall_event(event, event.process, socket)
 
         except ProcessSignal as sig:
              # SIGTRAP from ptrace/seccomp → advance child
-             LOGGER.debug("***SIGNAL***: %s", sig.name)
-             process.syscall()
+             LOGGER.debug("***SIGNAL*** %s PID: %d", sig.name, sig.process.pid)
+             sig.process.syscall()
              continue
 
         except NewProcessEvent as newproc:
             # A child fork/exec’d: re‐attach and advance
-            LOGGER.info("***CHILD-PROCESS***")
+            process_child = newproc.process
+            LOGGER.info("***CHILD-PROCESS*** PID: %d", process_child.pid)
+            process_child.syscall()
             newproc.process.parent.syscall()
             continue
 
-        except ProcessExit:
-            # Record end time and calculate duration
-            end_time = time.time()
-            execution_duration = end_time - start_time
-            LOGGER.info("***PROCESS-EXECUTED***")
-            LOGGER.info("Child process execution ended at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
-            LOGGER.info("Total execution time: %.3f seconds", execution_duration)
-            break
+        except ProcessExit as exitproc:
+            # A process terminate
+            LOGGER.info("***PROCESS-EXECUTED*** PID: %d", exitproc.process.pid)
+            continue
 
         except KeyboardInterrupt:
              # Record end time for interrupted execution
              end_time = time.time()
              execution_duration = end_time - start_time
              LOGGER.info("Exiting supervisor...")
-             LOGGER.info("Child process execution interrupted after %.3f seconds", execution_duration)
+             LOGGER.info("Monitor process execution interrupted after %.3f seconds", execution_duration)
              break
 
         except Exception as e:
@@ -443,8 +440,13 @@ def main():
              execution_duration = end_time - start_time
              LOGGER.error("Exception in main loop: %s", e)
              LOGGER.debug("Traceback: %s", traceback.format_exc())
-             LOGGER.info("Child process execution stopped due to error after %.3f seconds", execution_duration)
+             LOGGER.info("Monitor process execution stopped due to error after %.3f seconds", execution_duration)
              break
+    
+    end_time = time.time()
+    execution_duration = end_time - start_time
+    LOGGER.info("Monitor process execution ended at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
+    LOGGER.info("Total execution time: %.3f seconds", execution_duration)
 
     # Cleanup
     debugger.quit()
