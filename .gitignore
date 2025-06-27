@@ -69,3 +69,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Terraform
+*.tfvars
+benchmark/terraform/.terraform
+benchmark/terraform/.terraform.lock.hcl
