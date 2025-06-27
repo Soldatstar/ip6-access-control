@@ -446,7 +446,7 @@ def main():
     end_time = time.time()
     execution_duration = end_time - start_time
     LOGGER.info("Monitor process execution ended at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
-    LOGGER.error("Total execution time: %.3f seconds", execution_duration)
+    LOGGER.error("Total execution time: %.1f ms", execution_duration * 1000)
 
     # Cleanup
     debugger.quit()

@@ -40,6 +40,12 @@
         name: python3-tk
         state: present
 
+    - name: Install hyperfine
+      become: true
+      ansible.builtin.apt:
+        name: hyperfine
+        state: present
+        
     - name: Copy project to remote
       synchronize:
         src: "{{ project_local_path }}/"
