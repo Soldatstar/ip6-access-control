@@ -1,0 +1,25 @@
+---
+- name: Run benchmark script and get results
+  hosts: all
+  remote_user: debian
+  vars:
+    project_remote_path: "/home/debian/ip6-access-control"
+    script_path: "benchmark/ansible/run_and_log.sh"
+    log_file_path: "benchmark/benchmark_results.log"  # Adjust this to match your actual log file path
+
+  tasks:
+    - name: Make benchmark script executable
+      ansible.builtin.file:
+        path: "{{ project_remote_path }}/{{ script_path }}"
+        mode: '0755'
+      
+    - name: Run benchmark script from project root
+      ansible.builtin.shell: ./{{ script_path }}
+      args:
+        chdir: "{{ project_remote_path }}"
+      register: script_output
+
+    - name: Display last 15 lines of script output
+      ansible.builtin.debug:
+        msg: "{{ script_output.stdout_lines[-15:] }}"
+  
