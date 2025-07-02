@@ -46,6 +46,8 @@ ALLOW_SET = set()  # Set of tuples: (syscall_nr, arg1, arg2, ...)
 DENY_SET = set()
 DENY_NO_SECCOMP = set()
 SYSCALL_ID_SET = set()
+SYSCALL_COUNT = 0
+
 
 def init_seccomp(deny_list):
     """
@@ -288,6 +290,9 @@ def handle_syscall_event(event, process, socket):
         process: The process being traced.
         socket: The ZeroMQ socket for communication.
     """
+
+    global SYSCALL_COUNT
+    SYSCALL_COUNT += 1
     state = event.process.syscall_state
     syscall = state.event(FunctionCallOptions())
 
@@ -443,10 +448,25 @@ def main():
              LOGGER.info("Monitor process execution stopped due to error after %.3f seconds", execution_duration)
              break
     
-    end_time = time.time()
+        end_time = time.time()
     execution_duration = end_time - start_time
     LOGGER.info("Monitor process execution ended at %s", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
-    LOGGER.error("Total execution time: %.1f ms", execution_duration * 1000)
+    
+    LOGGER.error("Total execution time: %.3f ms", execution_duration * 1000)
+    
+    LOGGER.info("Performance metrics: %d syscalls processed", SYSCALL_COUNT)
+    
+    if execution_duration > 0:
+        syscalls_per_sec = SYSCALL_COUNT / execution_duration
+        LOGGER.error("Syscall processing rate: %.2f syscalls/sec", syscalls_per_sec)
+        
+    if SYSCALL_COUNT > 0:
+        avg_time_per_syscall = (execution_duration * 1000) / SYSCALL_COUNT
+        if avg_time_per_syscall >= 1.0:
+            LOGGER.error("Average time per syscall: %.3f ms", avg_time_per_syscall)
+        else:
+            LOGGER.error("Average time per syscall: %.3f μs", avg_time_per_syscall * 1000)
+            
 
     # Cleanup
     debugger.quit()
