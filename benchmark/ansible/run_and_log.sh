@@ -8,7 +8,7 @@ set -u
 set -o pipefail
 
 # --- Configuration ---
-RUNS=1000
+RUNS=500
 # Define all benchmark targets in an array
 BENCHMARKS=("run" "run2" "run3")
 AVERAGE_LOG="average_times.log"
@@ -107,13 +107,13 @@ echo "===================================================="
 echo "Running extra benchmarks with hyperfine and direct execution..."
 
 # 1. hyperfine for ./demo/child-process
-hyperfine ./demo/child-process -N --warmup 5 --runs 1000 > hyperfine_child-process.log
+hyperfine ./demo/child-process -N --warmup 5 --runs $RUNS > hyperfine_child-process.log
 
 # 2. hyperfine for ./demo/normal-file
-hyperfine ./demo/normal-file -N --warmup 5 --runs 1000 > normal-file.log
+hyperfine ./demo/normal-file -N --warmup 5 --runs $RUNS > normal-file.log
 
 # 3. hyperfine for ./demo/communication
-hyperfine ./demo/communication -N --warmup 5 --runs 1000 > communication.log
+hyperfine ./demo/communication -N --warmup 5 --runs $RUNS > communication.log
 
 echo "Extra benchmarks complete. Results saved to:"
 echo "  hyperfine_child-process.log"
