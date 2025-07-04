@@ -1,0 +1,29 @@
+{
+    "metadata": {
+        "process_name": "child-process",
+        "process_path": "/home/soldatstar/Projekte/ip6-access-control/demo/child-process",
+        "last_modified": "2025-06-27T12:43:48.077399",
+        "approved_by": "placeholder_user"
+    },
+    "rules": {
+        "allowed_syscalls": [
+            [
+                257,
+                [
+                    "*",
+                    "'demo/child-file.txt'",
+                    65,
+                    "*"
+                ]
+            ],
+            [
+                87,
+                [
+                    "'demo/child-file.txt'"
+                ]
+            ]
+        ],
+        "denied_syscalls": [],
+        "allowed_groups": []
+    }
+}

@@ -1,0 +1,87 @@
+---
+- name: Prepare environment for process supervisor demo
+  hosts: all
+  remote_user: debian
+  vars:
+    project_local_path: "{{ playbook_dir }}/../.."
+    project_remote_path: "/home/debian/ip6-access-control"
+    demo_programs:
+      - name: normal-file
+        rel_path: demo/normal-file
+        policy: policies/normal-file-parameter-allow/policy.json
+      - name: communication
+        rel_path: demo/communication
+        policy: policies/communication-parameter-allow/policy.json
+      - name: child-process
+        rel_path: demo/child-process
+        policy: policies/child-process-parameter-allow/policy.json
+
+  tasks:
+    - name: Update apt cache
+      become: true
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install build-essential
+      become: true
+      ansible.builtin.apt:
+        name: build-essential
+        state: present
+
+    - name: Install python3.11-venv
+      become: true
+      ansible.builtin.apt:
+        name: python3.11-venv
+        state: present
+
+    - name: Install python3-tk
+      become: true
+      ansible.builtin.apt:
+        name: python3-tk
+        state: present
+
+    - name: Install hyperfine
+      become: true
+      ansible.builtin.apt:
+        name: hyperfine
+        state: present
+        
+    - name: Copy project to remote
+      synchronize:
+        src: "{{ project_local_path }}/"
+        dest: "{{ project_remote_path }}/"
+        recursive: yes
+        delete: no
+    - name: Run 'make delete' in project directory on remote to ensure clean state
+      ansible.builtin.shell: make delete
+      args:
+        chdir: "{{ project_remote_path }}"        
+
+    - name: Run 'make create' in project directory on remote
+      ansible.builtin.shell: make create
+      args:
+        chdir: "{{ project_remote_path }}"
+
+    - name: Calculate hashes for demo program absolute paths
+      set_fact:
+        demo_hashes: >-
+          {{
+            demo_hashes | default({}) | combine({
+              item.name: (project_remote_path + '/' + item.rel_path) | hash('sha256')
+            })
+          }}
+      loop: "{{ demo_programs }}"
+
+    - name: Ensure policy directories exist on remote
+      file:
+        path: "{{ project_remote_path }}/process-supervisor/policies/{{ demo_hashes[item.name] }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ demo_programs }}"
+
+    - name: Copy policy files to hashed policy directories
+      copy:
+        src: "{{ item.policy }}"
+        dest: "{{ project_remote_path }}/process-supervisor/policies/{{ demo_hashes[item.name] }}/policy.json"
+        mode: '0644'
+      loop: "{{ demo_programs }}"

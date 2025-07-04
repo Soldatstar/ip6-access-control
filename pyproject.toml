@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name             = "ip6-access-control"
-version          = "0.0.4"
+version          = "1.0.0post1"
 authors          = [
   { name = "Damjan Mlinar" },
   { name = "Viktor Weilenmann" },
@@ -44,3 +44,6 @@ user-tool  = "user_tool.user_tool_main:main"
 
 [tool.setuptools]
 packages = { find = { exclude = ["tests"] } }
+
+[tool.setuptools.package-data]
+user_tool = ["groups"]

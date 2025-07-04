@@ -1,0 +1,49 @@
+---
+- name: Run benchmark script and get results
+  hosts: all
+  remote_user: debian
+  vars:
+    project_remote_path: "/home/debian/ip6-access-control"
+    script_path: "benchmark/ansible/run_and_log.sh"
+    log_file_path: "benchmark/benchmark_results.log"  # Adjust this to match your actual log file path
+    remote_results_dir: "{{ project_remote_path }}/results"
+    local_results_dir: "../results"  # Relative to playbook location
+
+  tasks:
+    - name: Make benchmark script executable
+      ansible.builtin.file:
+        path: "{{ project_remote_path }}/{{ script_path }}"
+        mode: '0755'
+      
+    - name: Run benchmark script from project root
+      ansible.builtin.shell: ./{{ script_path }}
+      args:
+        chdir: "{{ project_remote_path }}"
+      register: script_output
+
+    - name: Display last 15 lines of script output
+      ansible.builtin.debug:
+        msg: "{{ script_output.stdout_lines[-15:] }}"
+    
+    - name: Ensure local results directory exists
+      ansible.builtin.file:
+        path: "{{ local_results_dir }}"
+        state: directory
+      delegate_to: localhost
+      
+    - name: Find result files on remote host
+      ansible.builtin.find:
+        paths: "{{ remote_results_dir }}"
+        file_type: file
+      register: result_files
+      
+    - name: Fetch benchmark results from remote to local
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ local_results_dir }}/{{ inventory_hostname }}/"
+        flat: yes
+      loop: "{{ result_files.files }}"
+      
+    - name: Inform user about results location
+      ansible.builtin.debug:
+        msg: "Benchmark results for {{ inventory_hostname }} have been copied to {{ local_results_dir }}/{{ inventory_hostname }}/ ({{ result_files.files | length }} files)"

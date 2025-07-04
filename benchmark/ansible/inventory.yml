@@ -1,0 +1,6 @@
+webservers:
+  hosts:
+    benchie-1: 
+      ansible_host: 86.119.48.115
+    benchie-2: 
+      ansible_host: 86.119.49.213

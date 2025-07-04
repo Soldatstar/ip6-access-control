@@ -8,10 +8,10 @@ DEMOCOMMUNICATION = demo/communication
 DEMOCCOMMUNICATION = demo/communication.c
 DEMONORMALFILES = demo/normal-file
 DEMOCNORMALFILES = demo/normal-file.c
-DEMOBACKUP = demo/normal-file2
-DEMOCBACKUP = demo/normal-file2.c
 DEMOCHILDP = demo/child-process
 DEMOCCHILDP = demo/child-process.c
+DEMO_BACKUP = demo/normal-file2
+DEMOC_BACKUP = demo/normal-file2.c
 
 SUPERVISOR_DIR = supervisor
 USER_TOOL_DIR = user_tool
@@ -29,6 +29,8 @@ help:
 	@echo "  make test: Aktiviert das virtuelle Environment und führt die Tests aus (Linux)."
 	@echo "  make pylint: Aktiviert das virtuelle Environment und führt pylint aus (Linux)."
 	@echo "  make build: Aktiviert das virtuelle Environment und erstellt das Projekt (Linux)."
+	@echo "  make plots: Erstellt Plots aus den Benchmark-Ergebnissen."
+
 # Ziel zum Erstellen des virtuellen Environments und Installieren der Abhängigkeiten
 create: 
 	$(PYTHON) -m venv $(VENV_DIR) 
@@ -36,7 +38,7 @@ create:
 	$(PIP) install -r requirements.txt
 	gcc $(DEMOCCOMMUNICATION) -o $(DEMOCOMMUNICATION)
 	gcc $(DEMOCNORMALFILES) -o $(DEMONORMALFILES)
-	gcc $(DEMOCBACKUP) -o $(DEMOBACKUP)
+	gcc $(DEMOC_BACKUP) -o $(DEMO_BACKUP)
 	gcc $(DEMOCCHILDP) -o $(DEMOCHILDP)
 
 # Ziel zum Löschen des virtuellen Environments
@@ -96,4 +98,14 @@ run2v:
 run3v: 
 	$(ACTIVATE_LINUX) && $(PYTHON) supervisor/supervisor.py $(DEMOCHILDP) --debug
 
-.PHONY: help create delete run
+# Plotting targets
+plots: 
+	@echo "Generating plots from benchmark results..."
+	@mkdir -p benchmark/plotting/plots
+	@cd benchmark/plotting && bash generate_plots.sh
+	@echo "Plots generated in benchmark/plotting/plots/"
+
+setup-plot-env:
+	$(ACTIVATE_LINUX) && $(PIP) install matplotlib numpy scipy
+
+.PHONY: help create delete run plots setup-plot-env
