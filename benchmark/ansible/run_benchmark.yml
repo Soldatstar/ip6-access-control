@@ -7,7 +7,7 @@
     script_path: "benchmark/ansible/run_and_log.sh"
     log_file_path: "benchmark/benchmark_results.log"  # Adjust this to match your actual log file path
     remote_results_dir: "{{ project_remote_path }}/results"
-    local_results_dir: "../../results"  # Relative to playbook location
+    local_results_dir: "../results"  # Relative to playbook location
 
   tasks:
     - name: Make benchmark script executable

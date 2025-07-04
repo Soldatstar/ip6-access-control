@@ -16,7 +16,7 @@ BENCHMARKS["run2"]="files-demo"
 BENCHMARKS["run3"]="child-demo"
 
 # Create results directory
-RESULTS_DIR="results"
+RESULTS_DIR="benchmark/results"
 mkdir -p "$RESULTS_DIR"
 AVERAGE_LOG="${RESULTS_DIR}/average_times.log"
 
