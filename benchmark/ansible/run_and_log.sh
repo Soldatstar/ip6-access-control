@@ -8,16 +8,24 @@ set -u
 set -o pipefail
 
 # --- Configuration ---
-RUNS=500
-# Define all benchmark targets in an array
-BENCHMARKS=("run" "run2" "run3")
-AVERAGE_LOG="average_times.log"
+RUNS=10
+# Define all benchmark targets with their demo names in an array of arrays
+declare -A BENCHMARKS
+BENCHMARKS["run"]="default-demo"
+BENCHMARKS["run2"]="secondary-demo"
+BENCHMARKS["run3"]="tertiary-demo"
+
+# Create results directory
+RESULTS_DIR="results"
+mkdir -p "$RESULTS_DIR"
+AVERAGE_LOG="${RESULTS_DIR}/average_times.log"
 
 # --- Helper Function to Run a Full Benchmark Suite ---
 run_benchmark() {
     local make_target=$1
-    local times_log="${make_target}_times.log"
-    local supervisor_log="${make_target}_supervisor.log"
+    local demo_name=$2
+    local times_log="${RESULTS_DIR}/${make_target}_times.log"
+    local supervisor_log="${RESULTS_DIR}/${make_target}_supervisor.log"
 
     echo "===================================================="
     echo "--- Starting Benchmark for 'make ${make_target}'"
@@ -75,9 +83,9 @@ run_benchmark() {
         local avg_time
         avg_time=$(awk '{s+=$1} END {print s/NR}' "$times_log")
 
-        local avg_line="[${make_target}] --> Average execution time over ${total_runs_logged} runs: ${avg_time} ms."
+        local avg_line="[${make_target}:${demo_name}] --> Average execution time over ${total_runs_logged} runs: ${avg_time} ms."
         echo
-        echo "Benchmark for 'make ${make_target}' complete."
+        echo "Benchmark for 'make ${make_target}' (${demo_name}) complete."
         echo "$avg_line"
         echo "    (Raw times logged in '${times_log}')"
         # Save the average line to the summary file
@@ -95,8 +103,9 @@ run_benchmark() {
 > "$AVERAGE_LOG"
 
 # Loop through the defined benchmarks and run the function for each
-for benchmark_target in "${BENCHMARKS[@]}"; do
-    run_benchmark "$benchmark_target"
+for target in "${!BENCHMARKS[@]}"; do
+    demo_name="${BENCHMARKS[$target]}"
+    run_benchmark "$target" "$demo_name"
 done
 
 echo "===================================================="
@@ -107,34 +116,47 @@ echo "===================================================="
 echo "Running extra benchmarks with hyperfine and direct execution..."
 
 # 1. hyperfine for ./demo/child-process
-hyperfine ./demo/child-process -N --warmup 5 --runs $RUNS > hyperfine_child-process.log
+hyperfine ./demo/child-process -N --warmup 5 --runs $RUNS \
+  --export-json "${RESULTS_DIR}/hyperfine_child-process.json" \
+  > "${RESULTS_DIR}/hyperfine_child-process.log"
 
 # 2. hyperfine for ./demo/normal-file
-hyperfine ./demo/normal-file -N --warmup 5 --runs $RUNS > normal-file.log
+hyperfine ./demo/normal-file -N --warmup 5 --runs $RUNS \
+  --export-json "${RESULTS_DIR}/hyperfine_normal-file.json" \
+  > "${RESULTS_DIR}/normal-file.log"
 
 # 3. hyperfine for ./demo/communication
-hyperfine ./demo/communication -N --warmup 5 --runs $RUNS > communication.log
+hyperfine ./demo/communication -N --warmup 5 --runs $RUNS \
+  --export-json "${RESULTS_DIR}/hyperfine_communication.json" \
+  > "${RESULTS_DIR}/communication.log"
 
 echo "Extra benchmarks complete. Results saved to:"
-echo "  hyperfine_child-process.log"
-echo "  normal-file.log"
-echo "  communication.log"
+echo "  ${RESULTS_DIR}/hyperfine_child-process.log (JSON: ${RESULTS_DIR}/hyperfine_child-process.json)"
+echo "  ${RESULTS_DIR}/normal-file.log (JSON: ${RESULTS_DIR}/hyperfine_normal-file.json)"
+echo "  ${RESULTS_DIR}/communication.log (JSON: ${RESULTS_DIR}/hyperfine_communication.json)"
 
 # --- Append hyperfine results to summary file ---
 parse_hyperfine_mean() {
-    # $1: log file, $2: label
+    # $1: log file, $2: label, $3: demo name
     local mean_line
     mean_line=$(grep -m1 'Time (mean' "$1")
     if [[ -n "$mean_line" ]]; then
         # Extract the mean and stddev (e.g., 24.7 ms ±   8.9 ms)
         local mean
         mean=$(echo "$mean_line" | awk '{print $5 " " $6}')
-        echo "[$2] --> Hyperfine mean execution time: $mean" >> "$AVERAGE_LOG"
+        echo "[$2:$3] --> Hyperfine mean execution time: $mean" >> "$AVERAGE_LOG"
     else
-        echo "[$2] --> Hyperfine mean execution time: N/A" >> "$AVERAGE_LOG"
+        echo "[$2:$3] --> Hyperfine mean execution time: N/A" >> "$AVERAGE_LOG"
     fi
 }
 
-parse_hyperfine_mean hyperfine_child-process.log "hyperfine_child-process"
-parse_hyperfine_mean normal-file.log "hyperfine_normal-file"
-parse_hyperfine_mean communication.log "hyperfine_communication"
+parse_hyperfine_mean "${RESULTS_DIR}/hyperfine_child-process.log" "hyperfine_child-process" "child-process-demo"
+parse_hyperfine_mean "${RESULTS_DIR}/normal-file.log" "hyperfine_normal-file" "normal-file-demo"
+parse_hyperfine_mean "${RESULTS_DIR}/communication.log" "hyperfine_communication" "communication-demo"
+
+# Output the contents of average_times.log at the end
+echo "===================================================="
+echo "Final benchmark results from ${AVERAGE_LOG}:"
+echo "===================================================="
+cat "$AVERAGE_LOG"
+echo "===================================================="

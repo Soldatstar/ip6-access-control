@@ -52,6 +52,10 @@
         dest: "{{ project_remote_path }}/"
         recursive: yes
         delete: no
+    - name: Run 'make delete' in project directory on remote to ensure clean state
+      ansible.builtin.shell: make delete
+      args:
+        chdir: "{{ project_remote_path }}"        
 
     - name: Run 'make create' in project directory on remote
       ansible.builtin.shell: make create

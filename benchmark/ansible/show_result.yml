@@ -1,5 +1,5 @@
 ---
-- name: Copy and run benchmark script, then fetch results
+- name: fetch results
   hosts: all
   remote_user: debian
   vars:
