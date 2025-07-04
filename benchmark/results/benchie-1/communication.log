@@ -1,0 +1,4 @@
+Benchmark 1: ./demo/communication
+  Time (mean ± σ):       1.0 ms ±   0.4 ms    [User: 0.7 ms, System: 0.2 ms]
+  Range (min … max):     0.6 ms …   6.5 ms    5000 runs
+ 

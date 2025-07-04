@@ -37,6 +37,31 @@ make create # Erstellt eine Python-Umgebung und kompiliert den C-Code
 make ut   # Startet das User-Tool und wartet auf Anfragen über ZMQ
 make run  # Startet den Supervisor mit einer Demo für Datei-Zugriffe
 ```
+
+#### Verfügbare Make-Befehle
+```bash
+# Setup und Verwaltung
+make create       # Erstellt virtuelle Umgebung und kompiliert Demo-Programme
+make delete       # Löscht die virtuelle Umgebung und alle temporären Dateien
+make build        # Erstellt ein Python-Paket zur Veröffentlichung
+
+# Anwendungsausführung
+make ut           # Startet das User-Tool im normalen Modus
+make utv          # Startet das User-Tool im Debug-Modus mit ausführlicher Protokollierung
+make run          # Führt die Communication-Demo mit dem Supervisor aus
+make run2         # Führt die Datei-Operationen-Demo mit dem Supervisor aus
+make run3         # Führt die Child-Process-Demo mit dem Supervisor aus
+make runv         # Führt die Demo im Debug-Modus aus (auch run2v, run3v verfügbar)
+
+# Tests und Qualitätssicherung
+make test         # Führt alle Tests mit Coverage-Bericht aus
+make pylint       # Führt Pylint-Codeanalyse aus
+
+# Benchmarking
+make plots        # Generiert Plots aus Benchmark-Ergebnissen
+make setup-plot-env # Installiert Abhängigkeiten für die Plot-Generierung
+```
+
 #### Schnellstart (als python Installation)
 ```bash
 # Installieren Sie das Paket in einer Python-Umgebung
@@ -45,6 +70,42 @@ pip install ip6-access-control
 # In zwei separaten Terminals ausführen:
 user-tool               # Startet das User-Tool und wartet auf Anfragen über ZMQ
 supervisor $(which ls)  # Startet den Supervisor mit dem absoluten Pfad des Programms (z. B. "ls")
+```
+
+### Benchmarking
+
+Das Projekt enthält Tools zur Leistungsmessung des Access Control Systems. Benchmarks werden verwendet, um die Performance-Auswirkungen der Zugriffskontrolle zu messen und verschiedene Szenarien zu vergleichen.
+
+#### Remote Benchmarks mit Ansible
+
+Für konsistentere Ergebnisse wurden Benchmarks auf 2 Remote-Maschinen ausgeführt:
+
+```bash
+cd benchmark/ansible
+# Vorbereitung der Remote-Umgebungen
+ansible-playbook -i inventory.yml prepare-environment.yml
+
+# Ausführen der Benchmarks auf allen Remote-Maschinen
+ansible-playbook -i inventory.yml run_benchmark.yml
+
+# Generieren von Plots aus den Ergebnissen
+cd ..
+make plots
+```
+
+#### Ergebnisanalyse
+
+Die Benchmark-Ergebnisse werden in der `results/` Verzeichnis gespeichert und mit Matplotlib visualisiert:
+
+- **Histogramme**: Zeigen die Verteilung der Ausführungszeiten
+- **Liniendiagramme**: Zeigen Trends und potenzielle Performance-Abnahmen über mehrere Ausführungen
+- **Box-Plots**: Vergleichen die Leistung zwischen verschiedenen Szenarien und Umgebungen
+
+Die durchschnittlichen Ausführungszeiten werden in der Datei `average_times.log` protokolliert und können als schneller Vergleichspunkt verwendet werden.
+
+```bash
+# Anzeigen der durchschnittlichen Zeiten
+cat benchmark/results/*/average_times.log
 ```
 
 

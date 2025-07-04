@@ -1,0 +1,25 @@
+---
+- name: fetch results
+  hosts: all
+  remote_user: debian
+  vars:
+    project_local_path: "{{ playbook_dir }}/../.."
+    project_remote_path: "/home/debian/ip6-access-control"
+    result_file: "average_times.log"
+
+  tasks:
+    - name: Fetch average_times.log from remote
+      fetch:
+        src: "{{ project_remote_path }}/{{ result_file }}"
+        dest: "{{ playbook_dir }}/{{ result_file }}"
+        flat: yes
+
+    - name: Show average_times.log content
+      local_action:
+        module: shell
+        cmd: cat "{{ playbook_dir }}/{{ result_file }}"
+      register: avg_log_content
+
+    - name: Print average_times.log
+      debug:
+        msg: "{{ avg_log_content.stdout }}"

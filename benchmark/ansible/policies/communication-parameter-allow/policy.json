@@ -1,0 +1,86 @@
+{
+    "metadata": {
+        "process_name": "communication",
+        "process_path": "/home/soldatstar/Projekte/ip6-access-control/demo/communication",
+        "last_modified": "2025-06-27T12:38:06.912572",
+        "approved_by": "placeholder_user"
+    },
+    "rules": {
+        "allowed_syscalls": [
+            [
+                293,
+                [
+                    "*",
+                    "*"
+                ]
+            ],
+            [
+                41,
+                [
+                    2,
+                    1,
+                    "*"
+                ]
+            ],
+            [
+                41,
+                [
+                    2,
+                    2,
+                    "*"
+                ]
+            ],
+            [
+                41,
+                [
+                    1,
+                    1,
+                    "*"
+                ]
+            ],
+            [
+                41,
+                [
+                    16,
+                    3,
+                    "*"
+                ]
+            ],
+            [
+                53,
+                [
+                    "*",
+                    "*",
+                    "*",
+                    "*"
+                ]
+            ],
+            [
+                68,
+                [
+                    "*",
+                    "*"
+                ]
+            ],
+            [
+                240,
+                [
+                    "*",
+                    "*",
+                    "*",
+                    "*"
+                ]
+            ],
+            [
+                29,
+                [
+                    "*",
+                    "*",
+                    "*"
+                ]
+            ]
+        ],
+        "denied_syscalls": [],
+        "allowed_groups": []
+    }
+}
