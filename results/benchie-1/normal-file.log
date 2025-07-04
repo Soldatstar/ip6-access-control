@@ -1,0 +1,4 @@
+Benchmark 1: ./demo/normal-file
+  Time (mean ± σ):       1.2 ms ±   0.5 ms    [User: 0.8 ms, System: 0.2 ms]
+  Range (min … max):     0.8 ms …   7.6 ms    5000 runs
+ 

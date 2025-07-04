@@ -1,0 +1,6 @@
+[run:communication-demo] --> Average execution time over 5000 runs: 11.0895 ms.
+[run2:files-demo] --> Average execution time over 5000 runs: 19.2117 ms.
+[run3:child-demo] --> Average execution time over 5000 runs: 68.0971 ms.
+[hyperfine_child-process:child-process-demo] --> Hyperfine mean execution time: 2.1 ms
+[hyperfine_normal-file:normal-file-demo] --> Hyperfine mean execution time: 1.2 ms
+[hyperfine_communication:communication-demo] --> Hyperfine mean execution time: 1.0 ms

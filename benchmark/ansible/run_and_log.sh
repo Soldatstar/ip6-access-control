@@ -8,12 +8,12 @@ set -u
 set -o pipefail
 
 # --- Configuration ---
-RUNS=10
+RUNS=5000
 # Define all benchmark targets with their demo names in an array of arrays
 declare -A BENCHMARKS
-BENCHMARKS["run"]="default-demo"
-BENCHMARKS["run2"]="secondary-demo"
-BENCHMARKS["run3"]="tertiary-demo"
+BENCHMARKS["run"]="communication-demo"
+BENCHMARKS["run2"]="files-demo"
+BENCHMARKS["run3"]="child-demo"
 
 # Create results directory
 RESULTS_DIR="results"
