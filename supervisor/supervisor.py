@@ -10,6 +10,7 @@ import zmq
 import traceback
 import json
 import time
+import shutil  # Add this import
 from sys import stderr, argv, exit
 from os import execv, path, kill, getpid
 from signal import SIGKILL, SIGUSR1
@@ -103,7 +104,8 @@ def child_prozess(deny_list, argv):
     """
     init_seccomp(deny_list=deny_list)
     kill(getpid(), SIGUSR1)
-    execv(argv[1], [argv[1]]+argv[2:])
+    # Use the resolved path that's already stored in PROGRAM_ABSOLUTE_PATH
+    execv(PROGRAM_ABSOLUTE_PATH, [PROGRAM_ABSOLUTE_PATH]+argv[2:])
 
 
 def setup_zmq() -> zmq.Socket:
@@ -161,7 +163,7 @@ def set_program_path(relative_path):
     """
     global PROGRAM_RELATIVE_PATH, PROGRAM_ABSOLUTE_PATH
     PROGRAM_RELATIVE_PATH = relative_path
-    PROGRAM_ABSOLUTE_PATH = path.abspath(PROGRAM_RELATIVE_PATH)
+    PROGRAM_ABSOLUTE_PATH = path.abspath(relative_path)
 
 
 def init_shared_list(socket):
@@ -369,6 +371,33 @@ def handle_syscall_event(event, process, socket):
 
 
 
+def resolve_program_path(program_name):
+    """
+    Resolve a program name to its full path.
+    
+    If program_name is already an absolute path or a relative path with directory
+    components, it is returned as-is. Otherwise, it's treated as a command name
+    and resolved using PATH.
+    
+    Args:
+        program_name (str): Program name or path
+        
+    Returns:
+        str: Absolute path to the program or None if not found
+    """
+    # If it's already an absolute path or contains directory components
+    if path.isabs(program_name) or '/' in program_name:
+        return program_name
+    
+    # Otherwise, search in PATH
+    full_path = shutil.which(program_name)
+    if full_path:
+        return full_path
+    
+    # If not found, return original (will likely fail later)
+    return program_name
+
+
 def main():
     """
     Main function to start the supervisor.
@@ -377,11 +406,17 @@ def main():
     It also monitors syscalls and communicates with the decision-making server.
     """
     if len(argv) < 2:
-        print("Nutzung: %s program" % argv[0], file=stderr)
-        LOGGER.error("Nutzung: %s program", argv[0])
+        print("Usage: %s program [args...]" % argv[0], file=stderr)
+        LOGGER.error("Usage: %s program [args...]", argv[0])
         exit(1)
 
-    LOGGER.info("Starting supervisor for %s", argv[1])
+    # Resolve the program path first
+    resolved_path = resolve_program_path(argv[1])
+    LOGGER.info("Starting supervisor for %s (resolved to %s)", argv[1], resolved_path)
+    
+    # Replace the argument with the resolved path
+    argv[1] = resolved_path
+    
     set_program_path(relative_path=argv[1])
     socket = setup_zmq()
     init_shared_list(socket=socket)

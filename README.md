@@ -69,7 +69,7 @@ pip install ip6-access-control
 
 # In zwei separaten Terminals ausführen:
 user-tool               # Startet das User-Tool und wartet auf Anfragen über ZMQ
-supervisor $(which ls)  # Startet den Supervisor mit dem absoluten Pfad des Programms (z. B. "ls")
+supervisor ls  # Startet den Supervisor mit dem absoluten Pfad des Programms (z. B. "ls")
 ```
 
 ### Benchmarking
