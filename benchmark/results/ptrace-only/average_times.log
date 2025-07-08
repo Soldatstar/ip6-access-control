@@ -1,0 +1,6 @@
+[run:ptrace-only-demo] --> Average execution time over 10 runs: 101.2000 ms.
+[hyperfine_ptrace:ptrace-only-demo] --> Hyperfine mean execution time:  ms
+[run:ptrace-only-demo] --> Average execution time over 10 runs: 101.7000 ms.
+[hyperfine_ptrace:ptrace-only-demo] --> Hyperfine mean execution time:  ms
+[run:ptrace-only-demo] --> Average execution time over 10 runs: 103.9000 ms.
+[hyperfine_ptrace:ptrace-only-demo] --> Hyperfine mean execution time:  ms

@@ -18,6 +18,7 @@ from pathlib import Path
 import zmq
 import logging
 import argparse
+import importlib.resources
 
 # Add the parent directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -35,6 +36,36 @@ LOGGER.propagate = False  # Prevent double logging
 # Global variables
 REQUEST_QUEUE = queue.Queue()
 NEW_REQUEST_EVENT = threading.Event()
+
+# Find the groups file path
+def find_groups_file():
+    """Find the path to the groups file, whether in development or installed mode."""
+    # Check local development path first
+    local_path = "user_tool/groups"
+    if os.path.exists(local_path):
+        return local_path
+    
+    # Try package resource path
+    try:
+        with importlib.resources.path('user_tool', 'groups') as path:
+            return str(path)
+    except (ImportError, ModuleNotFoundError):
+        # Fallback - look in the same directory as this file
+        package_dir = os.path.dirname(__file__)
+        package_path = os.path.join(package_dir, 'groups')
+        if os.path.exists(package_path):
+            return package_path
+        
+        # One more fallback
+        parent_path = os.path.join(os.path.dirname(package_dir), 'user_tool', 'groups')
+        if os.path.exists(parent_path):
+            return parent_path
+            
+    LOGGER.error("Could not find groups file")
+    return "user_tool/groups"  # Return the default as last resort
+
+# Get the groups file path
+GROUPS_FILE_PATH = find_groups_file()
 
 def zmq_listener():
     """
@@ -104,7 +135,7 @@ def handle_requests():
 
             response = None
             # Read all group names from the groups file
-            all_groups = set(group_selector.get_groups_structure("user_tool/groups").keys())
+            all_groups = set(group_selector.get_groups_structure(GROUPS_FILE_PATH).keys())
 
             if os.path.exists(policy_file) and os.path.getsize(policy_file) > 0:
                 with open(policy_file, "r", encoding="UTF-8") as file:
@@ -274,16 +305,9 @@ def main(test_mode=False, debug=False):
     # Start the ZeroMQ listener in a background thread
     listener_thread = threading.Thread(target=zmq_listener, daemon=True)
     listener_thread.start()
-    group_selector.build_syscall_to_group_map("user_tool/groups")
-    # LOGGER.info("SYSCALL_TO_GROUP mapping: %s", group_selector.SYSCALL_TO_GROUP)
-    # LOGGER.info("Groups structure: %s", group_selector.get_groups_structure("user_tool/groups"))
-    # syscall_id = 132
-    # group = group_selector.get_group_for_syscall(syscall_id)
-    # LOGGER.info("Syscall %d belongs to group: %s", syscall_id, group)
-    # group_name = "FileTimestamp"
-    # ids = group_selector.get_syscalls_for_group(group_name)
-    # LOGGER.info("Syscall IDs for group %s: %s", group_name, ids)
-
+    group_selector.build_syscall_to_group_map(GROUPS_FILE_PATH)
+    LOGGER.debug(f"Using groups file: {GROUPS_FILE_PATH}")
+    
     while True:
         LOGGER.info("User Tool Menu:")
         LOGGER.info("1. List Known Apps")
