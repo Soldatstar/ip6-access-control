@@ -7,6 +7,10 @@ parameters, and arguments, and match syscalls with their corresponding parameter
 
 import re
 import logging
+import os
+import sys
+import importlib.resources
+
 GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
@@ -246,6 +250,26 @@ def build_syscall_to_group_map(groups_file: str):
     """
     global SYSCALL_TO_GROUP
     SYSCALL_TO_GROUP.clear()
+    
+    # Try to handle both development and installed environments
+    if not os.path.exists(groups_file):
+        try:
+            # For Python 3.9+
+            with importlib.resources.path('user_tool', 'groups') as path:
+                groups_file = str(path)
+        except (ImportError, ModuleNotFoundError, FileNotFoundError):
+            # Fallback approaches
+            package_dir = os.path.dirname(__file__)
+            possible_paths = [
+                os.path.join(package_dir, 'groups'),
+                os.path.join(os.path.dirname(package_dir), 'user_tool', 'groups')
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    groups_file = path
+                    break
+            
+    LOGGER.debug(f"Using groups file: {groups_file}")
     group_map = parse_groups_file(groups_file)
     for group, syscalls in group_map.items():
         for syscall in syscalls:
