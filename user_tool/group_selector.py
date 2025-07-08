@@ -7,6 +7,10 @@ parameters, and arguments, and match syscalls with their corresponding parameter
 
 import re
 import logging
+import os
+import sys
+import importlib.resources
+
 GROUPS_ORDER = []  # List to store the order of groups
 # Dictionary to store the order of parameters for each group
 GROUPS_PARAMETER_ORDER = {}
@@ -17,6 +21,9 @@ GROUPS_SYSCALL = {}  # Dictionary to store the system calls for each group
 PARAMETERS = {}  # Dictionary to store the parameters
 ARGUMENTS = {}  # Dictionary to store the arguments
 LOGGER = logging.getLogger("User-Tool")
+
+# Global variable to store the resolved groups file path
+GROUPS_FILE_PATH = None
 
 def parse_file(filename):
     """
@@ -244,8 +251,31 @@ def build_syscall_to_group_map(groups_file: str):
     """
     Build a global mapping from syscall ID to group name.
     """
-    global SYSCALL_TO_GROUP
+    global SYSCALL_TO_GROUP, GROUPS_FILE_PATH
     SYSCALL_TO_GROUP.clear()
+    
+    # Try to handle both development and installed environments
+    if not os.path.exists(groups_file):
+        try:
+            # For Python 3.9+
+            with importlib.resources.path('user_tool', 'groups') as path:
+                groups_file = str(path)
+        except (ImportError, ModuleNotFoundError, FileNotFoundError):
+            # Fallback approaches
+            package_dir = os.path.dirname(__file__)
+            possible_paths = [
+                os.path.join(package_dir, 'groups'),
+                os.path.join(os.path.dirname(package_dir), 'user_tool', 'groups')
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    groups_file = path
+                    break
+    
+    # Store the resolved groups file path for later use
+    GROUPS_FILE_PATH = groups_file
+    LOGGER.debug(f"Using groups file: {GROUPS_FILE_PATH}")
+    
     group_map = parse_groups_file(groups_file)
     for group, syscalls in group_map.items():
         for syscall in syscalls:
@@ -263,9 +293,26 @@ def get_groups_structure(filename: str) -> dict:
     """
     return parse_groups_file(filename)
 
-def get_syscalls_for_group(group_name: str, groups_file: str = "user_tool/groups"):
+def get_syscalls_for_group(group_name: str, groups_file: str = None):
     """
     Return a list of syscall IDs for a given group name.
+    
+    Args:
+        group_name (str): The name of the group to get syscalls for
+        groups_file (str, optional): Path to the groups file. If None, uses the globally resolved path
+        
+    Returns:
+        list: List of syscall IDs belonging to the specified group
     """
+    # Use the globally resolved path if available and no path was provided
+    if groups_file is None:
+        if GROUPS_FILE_PATH:
+            groups_file = GROUPS_FILE_PATH
+        else:
+            # Fall back to the default path if no global path is set
+            # (This should rarely happen as build_syscall_to_group_map should be called first)
+            groups_file = "user_tool/groups"
+            LOGGER.warning("No groups file path set, falling back to default: %s", groups_file)
+    
     groups = parse_groups_file(groups_file)
     return groups.get(group_name, [])

@@ -6,13 +6,13 @@ import sys
 import logging
 from user_tool import group_selector
 
-GROUP_FILE = "user_tool/groups"
 LOGGER = logging.getLogger("User-Tool")
+
 def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
                    parameter_formated, parameter_raw):
 
     # Prepare question text
-    group_selector.parse_file(filename=GROUP_FILE)
+    group_selector.parse_file(filename=group_selector.GROUPS_FILE_PATH)
     args, args_no_filter = group_selector.argument_separator(
         argument_raw=parameter_raw,
         argument_pretty=parameter_formated
@@ -126,7 +126,7 @@ def ask_permission(syscall_nr, syscall_name, program_name, program_hash,
     try:
         import os
         current_group = None
-        with open(GROUP_FILE, "r", encoding="utf-8") as f:
+        with open(group_selector.GROUPS_FILE_PATH, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line.startswith("g:"):
