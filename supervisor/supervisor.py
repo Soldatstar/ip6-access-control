@@ -121,39 +121,6 @@ def setup_zmq() -> zmq.Socket:
     return socket
 
 
-def ask_for_permission_zmq(syscall_name, syscall_nr, arguments_raw, arguments_formated, socket) -> str:
-    """
-    Request permission for a syscall via ZeroMQ.
-
-    Args:
-        syscall_name (str): Name of the syscall.
-        syscall_nr (int): Number of the syscall.
-        arguments_raw (list): Raw arguments of the syscall.
-        arguments_formated (list): Formatted arguments of the syscall.
-        socket (zmq.Socket): ZeroMQ socket for communication.
-
-    Returns:
-        str: Decision from the server ("ALLOW" or "DENY").
-    """
-    message = {
-        "type": "req_decision",
-        "body": {
-            "program": PROGRAM_ABSOLUTE_PATH,
-            "syscall_id": syscall_nr,
-            "syscall_name": syscall_name,
-            "parameter_raw": arguments_raw,
-            "parameter_formated": arguments_formated
-        }
-    }
-    LOGGER.info("Asking for permission for syscall: %s", syscall_name)
-    socket.send_multipart([b'', json.dumps(message).encode()])
-    while True:
-        _, response = socket.recv_multipart()
-        response_data = json.loads(response.decode())
-        LOGGER.debug("Received response: %s", response_data)
-        return response_data['data']
-
-
 def set_program_path(relative_path):
     """
     Set the relative and absolute paths of the program being supervised.
@@ -164,212 +131,6 @@ def set_program_path(relative_path):
     global PROGRAM_RELATIVE_PATH, PROGRAM_ABSOLUTE_PATH
     PROGRAM_RELATIVE_PATH = relative_path
     PROGRAM_ABSOLUTE_PATH = path.abspath(relative_path)
-
-
-def init_shared_list(socket):
-    """
-    Initialize the shared ALLOW_SET and DENY_SET from the database.
-
-    Args:
-        socket (zmq.Socket): ZeroMQ socket for communication.
-    """
-    global ALLOW_SET, DENY_SET, SYSCALL_ID_SET
-    message = {
-        "type": "read_db",
-        "body": {
-            "program": PROGRAM_ABSOLUTE_PATH
-        }
-    }
-    LOGGER.info("Initializing shared list with program path: %s", PROGRAM_ABSOLUTE_PATH)
-    LOGGER.debug("Sending message to user tool: %s", message)
-    socket.send_multipart([b'', json.dumps(message).encode()])
-    while True:
-        _, response = socket.recv_multipart()
-        response_data = json.loads(response.decode())
-        LOGGER.debug("Received response: %s", response_data)
-        LOGGER.info("Response status: %s", response_data['status'])
-        if response_data['status'] == "success":
-            ALLOW_SET.clear()
-            DENY_SET.clear()
-            DENY_NO_SECCOMP.clear()
-            SYSCALL_ID_SET.clear()
-            for syscall in response_data['data']['allowed_syscalls']:
-                syscall_number = syscall[0]
-                syscall_args = syscall[1]
-                ALLOW_SET.add(tuple([syscall_number] + syscall_args))
-            for syscall in response_data['data']['denied_syscalls']:
-                syscall_number = syscall[0]
-                syscall_args = syscall[1]
-                DENY_SET.add(tuple([syscall_number] + syscall_args))
-            rules = response_data['data']['blacklisted_ids']
-            for syscall_id in rules:
-                SYSCALL_ID_SET.add(syscall_id)
-            LOGGER.info("Shared list initialized successfully.")
-            LOGGER.debug("ALLOW_SET: %s", ALLOW_SET)
-            LOGGER.debug("DENY_SET: %s", DENY_SET)
-            LOGGER.debug("Dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
-            break
-        elif response_data['status'] == "error":
-            LOGGER.error("Error initializing shared list: %s", response_data['data'])
-            break
-
-
-def check_decision_made(syscall_nr, arguments):
-    """
-    Check if a decision has already been made for a syscall and its arguments.
-
-    Args:
-        syscall_nr (int): Number of the syscall.
-        arguments (list): Arguments of the syscall.
-
-    Returns:
-        tuple: (bool, bool) - The first bool indicates if the allow decision is already made, 
-                              the second bool indicates if the deny decision is already made
-    """
-    key = tuple([syscall_nr] + arguments)
-    # Fast O(1) check
-    if key in ALLOW_SET:
-        return True, False
-
-    if key in DENY_SET:
-        return False, True
-
-    # Wildcard support: check for any tuple with "*" in place of any argument
-    # (e.g., (nr, "*", ...)), but only if needed
-    for allow_key in ALLOW_SET:
-        if allow_key[0] == syscall_nr and len(allow_key) == len(key):
-            if all(a == "*" or a == b for a, b in zip(allow_key[1:], key[1:])):
-                return True, False
-    
-    for deny_key in DENY_SET:
-        if deny_key[0] == syscall_nr and len(deny_key) == len(key):
-            if all(a == "*" or a == b for a, b in zip(deny_key[1:], key[1:])):
-                return False, True
-
-    return False, False
-
-def prepare_arguments(syscall_args):
-    """
-    Prepare arguments for a syscall based on their type.
-
-    Args:
-        syscall_args (list): List of syscall argument objects.
-
-    Returns:
-        list: Prepared arguments.
-    """
-    def is_hex(s: str) -> bool:
-        if s.startswith(("0x", "0X")):
-            s = s[2:]
-        
-        if not s:
-            return False
-        
-        hex_digits = set("0123456789abcdefABCDEF")
-        return all(c in hex_digits for c in s)
-
-    arguments = []
-    for arg in syscall_args:
-        formatted = arg.format()
-        if any(not char.isdigit() for char in formatted) and not is_hex(formatted):
-            match arg.name:
-                case "filename" | "pathname" | "oldname" | "old" | "path":
-                    arguments.append(formatted)
-                case "flags" | "domain" | "type":
-                    arguments.append(arg.value)
-                case _:
-                    arguments.append("*")
-        else: 
-            arguments.append("*")
-    return arguments
-
-def handle_syscall_event(event, process, socket):
-    """
-    Handle a syscall event: check, log, and ask for permission if needed.
-
-    Args:
-        event: The syscall event to handle.
-        process: The process being traced.
-        socket: The ZeroMQ socket for communication.
-    """
-
-    global SYSCALL_COUNT
-    SYSCALL_COUNT += 1
-    state = event.process.syscall_state
-    syscall = state.event(FunctionCallOptions())
-
-    if syscall.result is None:
-        syscall_number = syscall.syscall
-        syscall_name = syscall.name
-
-        LOGGER.info("Syscall number: %s", syscall_number)
-        syscall_args = prepare_arguments(syscall_args=syscall.arguments)
-        syscall_args_formated = [arg.format() + f"[{arg.name}]" for arg in syscall.arguments]
-        combined_tuple = tuple([syscall_number] + syscall_args)
-        LOGGER.info("Catching new syscall: %s PID: %d", syscall.format(), process.pid)
-        decided_to_allow, decided_to_deny = check_decision_made(syscall_nr=syscall_number, arguments=syscall_args)
-
-        if not decided_to_deny and syscall_number not in SYSCALL_ID_SET:
-            LOGGER.debug("Skipping non blacklisted call: %s %s", syscall_number, syscall_name)
-            process.syscall()
-            return
-
-        if not decided_to_allow and not decided_to_deny:
-            decision = ask_for_permission_zmq(
-                syscall_name=syscall_name,
-                syscall_nr=syscall_number,
-                arguments_raw=syscall_args,
-                arguments_formated=syscall_args_formated,
-                socket=socket
-            )
-            if decision["decision"] == "ALLOW":
-                LOGGER.info("Decision: ALLOW(group) Syscall: %s", syscall.format())
-                size_before = len(SYSCALL_ID_SET)
-                for sid in decision.get("allowed_ids", []):
-                    SYSCALL_ID_SET.discard(sid)
-                LOGGER.debug("Updated dynamic blacklist (SYSCALL_ID_SET): %s", SYSCALL_ID_SET)
-                LOGGER.debug("Size of SYSCALL_ID_SET before: %d, after: %d", size_before, len(SYSCALL_ID_SET))
-
-            if decision["decision"] == "ALLOW_THIS":
-                LOGGER.info("Decision: ALLOW_THIS Syscall: %s", syscall.format())
-                LOGGER.debug("Updated ALLOW set with: %s", combined_tuple)
-                ALLOW_SET.add(combined_tuple)
-                
-            if decision["decision"] == "DENY":
-                LOGGER.debug("Updated DENY set with: %s", combined_tuple)
-                DENY_SET.add(combined_tuple)
-                DENY_NO_SECCOMP.add(combined_tuple)
-                LOGGER.debug("DENY set after update: %s", DENY_SET)
-                LOGGER.debug("DENY_NO_SECCOMP set after update: %s", DENY_NO_SECCOMP)
-                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
-                process.setreg('orig_rax', -EPERM)
-                process.setreg('rax', -EPERM)
-        elif decided_to_deny:
-            no_seccomp = False
-
-            if combined_tuple in DENY_NO_SECCOMP:
-                no_seccomp = True
-
-            for deny_key in DENY_NO_SECCOMP:
-                if deny_key[0] == syscall_number and len(deny_key) == len(combined_tuple):
-                    if all(a == "*" or a == b for a, b in zip(deny_key[1:], combined_tuple[1:])):
-                        no_seccomp = True
-
-            if any(isinstance(arg, str) and arg != "*" for arg in syscall_args):
-                no_seccomp = True
-                
-            if no_seccomp: 
-                LOGGER.debug("Syscall: %s must be denied without seccomp", syscall_args)
-                LOGGER.info("Decision: DENY Syscall: %s", syscall.format())
-                process.setreg('orig_rax', -EPERM)
-                process.setreg('rax', -EPERM)
-            else:
-                LOGGER.debug("Syscall %s will be denied by seccomp", syscall.format())
-        else:
-            LOGGER.debug("Syscall %s was already allowed", syscall.format())
-    process.syscall()
-
-
 
 def resolve_program_path(program_name):
     """
@@ -436,8 +197,8 @@ def main():
     program_args = [resolved_path] + remaining_args[1:]
     
     set_program_path(relative_path=resolved_path)
-    socket = setup_zmq()
-    init_shared_list(socket=socket)
+    #socket = setup_zmq()
+    #init_shared_list(socket=socket)
 
     child = Process(target=child_prozess, args=(DENY_SET, ["supervisor"] + program_args))
     debugger = PtraceDebugger()
@@ -463,7 +224,8 @@ def main():
              event = debugger.waitSyscall()
 
              # If it's genuinely a syscall event, handle it:
-             handle_syscall_event(event, event.process, socket)
+             event.process.syscall()  # Advance the process to the syscall state
+             #handle_syscall_event(event, event.process, socket)
 
         except ProcessSignal as sig:
              # SIGTRAP from ptrace/seccomp → advance child
@@ -524,7 +286,7 @@ def main():
     # Cleanup
     debugger.quit()
     child.join()
-    socket.close()
+    #socket.close()
 
 
 if __name__ == "__main__":

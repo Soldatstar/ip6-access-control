@@ -8,7 +8,7 @@ set -u
 set -o pipefail
 
 # --- Configuration ---
-RUNS=5000
+RUNS=1000
 # Define all benchmark targets with their demo names in an array of arrays
 declare -A BENCHMARKS
 BENCHMARKS["run"]="communication-demo"
